@@ -1,12 +1,14 @@
 import argparse
 import os
 import pickle
-from collections import defaultdict
+from collections import namedtuple
 
 from tqdm import tqdm
 
-from nlp.parsing import EmbeddingExtractor, nlp
+from nlp.parsing import EmbeddingExtractor
 from read_data.raw_file import RawFileReader
+
+Word = namedtuple('Word', ['form', 'lemma', 'pos', 'sentence', 'embedding'])
 
 
 def main():
@@ -17,17 +19,16 @@ def main():
 
     args = parser.parse_args()
 
-    results = defaultdict(list)
-
     reader = RawFileReader(args.input)
     extractor = EmbeddingExtractor()
-    for doc in tqdm(nlp.pipe(reader, batch_size=50)):
-        embeddings = extractor.get_word_embeddings(doc)
-        for token_text, pos, embedding in embeddings:
-            results[token_text].append((pos, embedding))
+    all_words = []
+    for doc in tqdm(extractor.nlp.pipe(reader, batch_size=50)):
+        word_gen = (Word(token.text, token.lemma_, token.pos_, token.doc.text, embedding)
+                    for token, embedding in extractor.get_word_embeddings(doc))
+        all_words.extend(word_gen)
 
     with open(args.output, 'wb') as outfile:
-        pickle.dump(dict(results), outfile, protocol=5)
+        pickle.dump(all_words, outfile, protocol=5)
 
 
 if __name__ == '__main__':
