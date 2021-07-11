@@ -2,3 +2,4 @@ tqdm
 spacy[cuda,transformers]
 numpy
 sklearn
+torch

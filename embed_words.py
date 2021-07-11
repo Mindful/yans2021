@@ -23,9 +23,14 @@ def main():
     extractor = EmbeddingExtractor()
     all_words = []
     for doc in tqdm(extractor.nlp.pipe(reader, batch_size=50)):
-        word_gen = (Word(token.text, token.lemma_, token.pos_, token.doc.text, embedding)
-                    for token, embedding in extractor.get_word_embeddings(doc))
-        all_words.extend(word_gen)
+        try:
+            word_gen = (Word(token.text, token.lemma_, token.pos_, token.doc.text, embedding)
+                        for token, embedding in extractor.get_word_embeddings(doc))
+            all_words.extend(word_gen)
+        except Exception as e:
+            print('Failed processing doc')
+            print(doc)
+            raise e
 
     with open(args.output, 'wb') as outfile:
         pickle.dump(all_words, outfile, protocol=5)
