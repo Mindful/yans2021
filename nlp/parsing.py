@@ -43,7 +43,7 @@ class EmbeddingExtractor:
 
         results = []
         for token, alignments in zip(doc, doc._.trf_data.align):
-            if token.pos in self.target_pos_set:
+            if token.pos in self.target_pos_set and alignments.data.shape[0] != 0:
                 token_embedding = embeddings[alignments.data[0, 0]:alignments.data[-1, 0] + 1]
                 results.append((token, self.embedding_reducer(token_embedding)))
 
