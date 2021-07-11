@@ -3,6 +3,8 @@ import pickle
 from sklearn.cluster import KMeans
 from collections import defaultdict, namedtuple
 import numpy as np
+from tqdm import tqdm
+
 from embed_words import Word
 
 WordCluster = namedtuple('WordCluster', ['cluster', 'words'])
@@ -27,7 +29,7 @@ def main():
 
     result_groups = dict()
 
-    for key, words in groups.items():
+    for key, words in tqdm(groups.items(), 'clustering word embeddings'):
         cluster_count = 2
         embedding_array = np.stack([word.embedding for word in words])
         if embedding_array.shape[0] >= cluster_count:
