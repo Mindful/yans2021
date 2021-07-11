@@ -19,7 +19,7 @@ def main():
 
     args = parser.parse_args()
 
-    reader = RawFileReader(args.input)
+    reader = RawFileReader(args.input, max_line_length=1000)
     extractor = EmbeddingExtractor()
     all_words = []
     for doc in tqdm(extractor.nlp.pipe(reader, batch_size=50)):
