@@ -4,9 +4,9 @@ import pickle
 from collections import namedtuple
 
 from tqdm import tqdm
-
 from nlp.parsing import EmbeddingExtractor
 from read_data.raw_file import RawFileReader
+
 
 Word = namedtuple('Word', ['form', 'lemma', 'pos', 'sentence', 'embedding'])
 

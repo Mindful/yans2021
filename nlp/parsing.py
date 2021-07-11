@@ -7,8 +7,10 @@ from spacy.tokens import Doc, Token
 
 import torch
 
-if torch.cuda.is_available():
+using_gpu = torch.cuda.is_available()
+if using_gpu:
     spacy.require_gpu(0)
+    import cupy
 
 
 def reduce_to_first(embeddings: np.ndarray):
@@ -45,6 +47,8 @@ class EmbeddingExtractor:
         for token, alignments in zip(doc, doc._.trf_data.align):
             if token.pos in self.target_pos_set and alignments.data.shape[0] != 0:
                 token_embedding = embeddings[alignments.data[0, 0]:alignments.data[-1, 0] + 1]
+                if using_gpu:
+                    token_embedding = cupy.asnumpy(token_embedding)  # move the array off the GPU
                 results.append((token, self.embedding_reducer(token_embedding)))
 
         return results

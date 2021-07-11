@@ -10,9 +10,10 @@ class RawFileReader:
         self.filename = filename
         self.file = open(filename, 'r')
         self.max_len = max_line_length
+        self.total_lines = fast_linecount(self.filename)
 
     def __iter__(self):
-        for line in tqdm(self.file, desc=f'reading {self.filename}', total=fast_linecount(self.filename)):
+        for line in tqdm(self.file, desc=f'reading {self.filename}', total=self.total_lines):
             output_line = line.strip()
             if self.max_len is None or len(output_line) < self.max_len:
                 yield output_line
