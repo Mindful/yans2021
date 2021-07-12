@@ -61,9 +61,11 @@ def main():
             examples_close_to_example = sorted(examples,
                                                key=lambda x: euclidean_distances(examples[0].embedding.reshape(1, -1),
                                                                                  embedding.reshape(1, -1)))
-            print('-----first cluster examples-----')
             for example in examples_close_to_example[0:5]:
                 print(example.sentence)
+
+        
+        print('-----first cluster examples-----')
         for example in examples[0:5]:
             print(example.sentence)
 
