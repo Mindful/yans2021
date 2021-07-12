@@ -44,10 +44,9 @@ def main():
         examples = [word for word, label in zip(word_cluster.words, word_cluster.cluster.labels_)
                     if label == cluster_label]
 
-
         print()
         print('------------ cluster', cluster_label, '------------')
-        print(len(word_cluster.words), 'total words in cluster')
+        print(sum(1 for x in word_cluster.cluster.labels_ if x == cluster_label), 'total words in cluster')
         if cluster_label == target_label:
             print('<<MATCHING CLUSTER>>')
 
