@@ -36,9 +36,16 @@ def main():
     word_cluster = data[token.lemma_]
     target_label = word_cluster.cluster.predict(np.expand_dims(embedding, 0))
 
-    examples = [word for word, label in zip(word_cluster.words, word_cluster.cluster.labels_) if label == target_label]
-    for example in examples[0:5]:
-        print(example.sentence)
+    for cluster_label in word_cluster.cluster.labels_:
+        examples = [word for word, label in zip(word_cluster.words, word_cluster.cluster.labels_)
+                    if label == cluster_label]
+
+        print()
+        print('------------ cluster', cluster_label, '------------')
+        if cluster_label == target_label:
+            print('<<MATCHING CLUSTER>>')
+        for example in examples[0:5]:
+            print(example.sentence)
 
 
 if __name__ == '__main__':
