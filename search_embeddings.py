@@ -8,6 +8,7 @@ from embed_words import Word
 from cluster_words import WordCluster
 from sklearn.cluster import KMeans
 import numpy as np
+from sklearn.metrics.pairwise import euclidean_distances
 
 target_word_regex = re.compile(r'\[.+\]')
 
@@ -36,14 +37,33 @@ def main():
     word_cluster = data[token.lemma_]
     target_label = word_cluster.cluster.predict(np.expand_dims(embedding, 0))
 
-    for cluster_label in set(word_cluster.cluster.labels_):
+    centroids = word_cluster.cluster.cluster_centers_
+    labels = sorted(set(word_cluster.cluster.labels_))
+
+    for cluster_label, cluster_centroid in zip(labels, centroids):
         examples = [word for word, label in zip(word_cluster.words, word_cluster.cluster.labels_)
                     if label == cluster_label]
+
 
         print()
         print('------------ cluster', cluster_label, '------------')
         if cluster_label == target_label:
             print('<<MATCHING CLUSTER>>')
+
+            print('-----sorted by distance to centroid-----')
+            examples_close_to_centroid = sorted(examples,
+                                                key=lambda x: euclidean_distances(examples[0].embedding.reshape(1, -1),
+                                                                                  cluster_centroid.reshape(1, -1)))
+            for example in examples_close_to_centroid[0:5]:
+                print(example.sentence)
+
+            print('-----sorted by distance to input-----')
+            examples_close_to_example = sorted(examples,
+                                               key=lambda x: euclidean_distances(examples[0].embedding.reshape(1, -1),
+                                                                                 embedding.reshape(1, -1)))
+            print('-----first cluster examples-----')
+            for example in examples_close_to_example[0:5]:
+                print(example.sentence)
         for example in examples[0:5]:
             print(example.sentence)
 
