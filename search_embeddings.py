@@ -47,6 +47,7 @@ def main():
 
         print()
         print('------------ cluster', cluster_label, '------------')
+        print(len(word_cluster.words), 'total words in cluster')
         if cluster_label == target_label:
             print('<<MATCHING CLUSTER>>')
 
@@ -64,7 +65,7 @@ def main():
             for example in examples_close_to_example[0:5]:
                 print(example.sentence)
 
-        
+
         print('-----first cluster examples-----')
         for example in examples[0:5]:
             print(example.sentence)
