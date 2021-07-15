@@ -24,13 +24,13 @@ def main():
     with open(args.output, 'w') as outfile:
         for word in words:
             cluster = data[word]
-            cluster_sizes = Counter(cluster.cluster._labels)
+            cluster_sizes = Counter(cluster.cluster.labels_)
 
             largest_cluster = max(cluster_sizes.items(), key=lambda x: x[1])[0]
             centroid = list(cluster.cluster.cluster_centers_)[largest_cluster]
 
             output_list = [word] + list(centroid)
-            outfile.write(' '.join(output_list) + '\n')
+            outfile.write(' '.join(str(x) for x in output_list) + '\n')
 
 
 if __name__ == '__main__':
