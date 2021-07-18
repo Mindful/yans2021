@@ -2,33 +2,27 @@ import argparse
 import os
 import logging
 
-from tqdm import tqdm
 from nlp.parsing import EmbeddingExtractor, reduction_function
-from data.input import RawFileReader
 from data.db import DbConnection, Word
-
-logging.getLogger().setLevel(logging.INFO)
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', required=True)
-    parser.add_argument('--output', required=True)
-    parser.add_argument('--run', required=False, default='default')
+    parser.add_argument('--run', required=False, default='default_run')
     parser.add_argument('--reduction', required=False, default='first')
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
     args = parser.parse_args()
 
-    reader = RawFileReader(args.input, max_line_length=1000)
-    extractor = EmbeddingExtractor(embedding_reducer=reduction_function[args.reduction])
     db = DbConnection(args.run)
-    db.connect_for_saving()
+    extractor = EmbeddingExtractor(embedding_reducer=reduction_function[args.reduction])
 
-    for doc in tqdm(extractor.nlp.pipe(reader, batch_size=50)):
+    sentence_generator = ((text, ident) for ident, text in db.read_sentences(use_tqdm=True))
+    for doc, ident in extractor.nlp.pipe(sentence_generator, batch_size=50, as_tuples=True):
         try:
-            word_gen = (Word(token.text, token.lemma_, token.pos, token.doc.text, embedding)
+            word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
             db.add_words(word_gen)
         except Exception as e:

@@ -14,12 +14,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', required=True)
     parser.add_argument('--group_by', required=False, default='lemma')
-    parser.add_argument('--run', required=False, default='default')
+    parser.add_argument('--run', required=False, default='default_run')
 
     args = parser.parse_args()
 
     db = DbConnection(args.run)
-    db.connect_for_reading()
 
     groups = defaultdict(list)
 

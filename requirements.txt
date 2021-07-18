@@ -3,3 +3,4 @@ spacy[cuda,transformers]
 numpy
 sklearn
 torch
+datasets
