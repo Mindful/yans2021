@@ -6,7 +6,7 @@ import datasets
 import spacy
 from datasets import tqdm
 
-from data.db import DbConnection
+from data.db import DbConnection, WriteBuffer
 from data.input import RawFileReader
 
 
@@ -21,7 +21,7 @@ def to_sentences(dataset: datasets.Dataset) -> Iterable[str]:
 
 
 datasets_dict = {
-    'wiki': lambda: tqdm(to_sentences(datasets.load_dataset('wikipedia', '20200501.en')))
+    'wiki': lambda: tqdm(to_sentences(datasets.load_dataset('wikipedia', '20200501.en')['train']))
 }
 
 
@@ -38,15 +38,15 @@ def main():
         logger.info(f'Reading sentences from file {args.input}')
         sentence_iter = RawFileReader(args.input)
     else:
-        sentence_iter = datasets_dict[args.input]
+        sentence_iter = datasets_dict[args.input]()
 
     db = DbConnection(args.run)
+    write_buffer = WriteBuffer('sentence', db.save_sentences)
 
     for sentence in sentence_iter:
-        db.add_sentence(sentence)
+        write_buffer.add(sentence)
 
-    db.done()
-
+    write_buffer.flush()
 
 if __name__ == '__main__':
     main()

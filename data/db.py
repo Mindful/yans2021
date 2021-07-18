@@ -1,6 +1,6 @@
 import sqlite3
 from collections import namedtuple
-from typing import List, Iterable, Tuple
+from typing import List, Iterable, Tuple, Callable
 from itertools import count
 import logging
 from tqdm import tqdm
@@ -15,7 +15,8 @@ word_attributes = [
     ('embedding', 'ARRAY NOT NULL')
 ]
 Word = namedtuple('Word', [name for name, type_ in word_attributes])
-WORD_TABLE_SCHEMA = '(' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + ')'
+WORD_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + \
+                    ', FOREIGN KEY (sentence) REFERENCES sentences (id) )'
 SENTENCE_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, sent TEXT NOT NULL UNIQUE)'
 
 
@@ -41,21 +42,39 @@ sqlite3.register_converter("ARRAY", convert_array)
 logger = logging.getLogger()
 
 
-class DbConnection:
-    def __init__(self, db_name: str, buffer_size: int = 100000):
-        self.db_name = db_name + '.db'
+class WriteBuffer:
+    def __init__(self, name: str, save_function: Callable, buffer_size: int = 100000):
+        self.name = name
+        self.save_function = save_function
         self.buffer_size = buffer_size
-        self.word_buffer = []
-        self.sentence_buffer = []
+        self.buffer = []
 
-        self.sent_counter = count()
-        self.is_done = False
+    def add(self, item):
+        self.buffer.append(item)
 
+    def add_many(self, items: Iterable):
+        self.buffer.extend(items)
+        if len(self.buffer) > self.buffer_size:
+            self.flush()
+
+    def flush(self):
+        items_to_save = self.buffer[:self.buffer_size]
+        logger.info(f'Saving {len(items_to_save)} f{self.name}s')
+        self.save_function(items_to_save)
+        self.buffer = self.buffer[self.buffer_size:]
+
+    def __del__(self):
+        if len(self.buffer) > 0:
+            raise RuntimeError(f'f{self.name} write buffer destroyed with {len(self.buffer)} items remaining in memory')
+
+
+class DbConnection:
+    def __init__(self, db_name: str):
+        self.db_name = db_name + '.db'
         con = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
         self.con = con
         self.cur = cur
-
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS sentences{SENTENCE_TABLE_SCHEMA}')
         self.con.commit()
@@ -94,52 +113,14 @@ class DbConnection:
             for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
                 yield build_word(row)
 
-    def done(self):
-        if len(self.word_buffer) > 0:
-            self._save_word_buffer()
-
-        if len(self.sentence_buffer) > 0:
-            self._save_sentence_buffer()
-
-        self.cur.close()
-        self.con.close()
-        self.is_done = True
-
-    def add_sentence(self, sentence: str):
-        self.sentence_buffer.append(sentence)
-        if len(self.sentence_buffer) > self.buffer_size:
-            self._save_sentence_buffer()
-
-    def _save_sentence_buffer(self):
-        sents_to_save = self.sentence_buffer[:self.buffer_size]
-        logger.info(f'Saving {len(sents_to_save)} sentences')
-        self._save_sentences(sents_to_save)
-        self.sentence_buffer = self.sentence_buffer[self.buffer_size:]
-
-    def _save_sentences(self, sents: List[str]):
+    def save_sentences(self, sents: List[str]):
         self.cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
         self.con.commit()
 
-    def add_words(self, words: Iterable[Word]):
-        self.word_buffer.extend(words)
-        if len(self.word_buffer) > self.buffer_size:
-            self._save_word_buffer()
-
-    def _save_word_buffer(self):
-        words_to_save = self.word_buffer[:self.buffer_size]
-        logger.info(f'Saving {len(words_to_save)} words')
-        self._save_words(words_to_save)
-        self.word_buffer = self.word_buffer[self.buffer_size:]
-
-    def _save_words(self, words: List[Word]) -> None:
-        self.cur.executemany(f'INSERT INTO words values ({",".join("?" for x in word_attributes)})', words)
+    def save_words(self, words: List[Word]) -> None:
+        self.cur.executemany(f'INSERT INTO words ({",".join(name for name, type_ in word_attributes)})'
+                             f' values ({",".join("?" for x in word_attributes)})', words)
         self.con.commit()
-
-    def __del__(self):
-        if not self.is_done:
-            raise RuntimeError('Database connection destroyed before done() was called')
-
-
 
 
 

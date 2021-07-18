@@ -3,7 +3,7 @@ import os
 import logging
 
 from nlp.parsing import EmbeddingExtractor, reduction_function
-from data.db import DbConnection, Word
+from data.db import DbConnection, Word, WriteBuffer
 
 
 def main():
@@ -17,6 +17,7 @@ def main():
     args = parser.parse_args()
 
     db = DbConnection(args.run)
+    write_buffer = WriteBuffer('word', db.save_words)
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[args.reduction])
 
     sentence_generator = ((text, ident) for ident, text in db.read_sentences(use_tqdm=True))
@@ -24,13 +25,13 @@ def main():
         try:
             word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
-            db.add_words(word_gen)
+            write_buffer.add_many(word_gen)
         except Exception as e:
             logger.error('Failed processing doc')
             print(doc)
             raise e
 
-    db.done()
+    write_buffer.flush()
 
 
 if __name__ == '__main__':

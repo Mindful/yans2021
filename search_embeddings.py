@@ -5,7 +5,7 @@ import re
 
 from nlp.parsing import EmbeddingExtractor
 from embed_words import Word
-from cluster_words import WordCluster
+from cluster_by_key import WordCluster
 from sklearn.cluster import KMeans
 import numpy as np
 from sklearn.metrics.pairwise import euclidean_distances
