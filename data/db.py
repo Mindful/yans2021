@@ -51,6 +51,8 @@ class WriteBuffer:
 
     def add(self, item):
         self.buffer.append(item)
+        if len(self.buffer) > self.buffer_size:
+            self.flush()
 
     def add_many(self, items: Iterable):
         self.buffer.extend(items)
