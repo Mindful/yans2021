@@ -3,7 +3,7 @@ import os
 import logging
 
 from tqdm import tqdm
-from nlp.parsing import EmbeddingExtractor
+from nlp.parsing import EmbeddingExtractor, reduction_function
 from data.input import RawFileReader
 from data.db import DbConnection, Word
 
@@ -16,13 +16,13 @@ def main():
     parser.add_argument('--input', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--run', required=False, default='default')
+    parser.add_argument('--reduction', required=False, default='first')
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
     args = parser.parse_args()
-    logger.info(f'Running with run name {args.run}')
 
     reader = RawFileReader(args.input, max_line_length=1000)
-    extractor = EmbeddingExtractor()
+    extractor = EmbeddingExtractor(embedding_reducer=reduction_function[args.reduction])
     db = DbConnection(args.run)
     db.connect_for_saving()
 
@@ -32,7 +32,7 @@ def main():
                         for token, embedding in extractor.get_word_embeddings(doc))
             db.add_words(word_gen)
         except Exception as e:
-            print('Failed processing doc')
+            logger.error('Failed processing doc')
             print(doc)
             raise e
 

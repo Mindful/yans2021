@@ -17,6 +17,20 @@ def reduce_to_first(embeddings: np.ndarray):
     return embeddings[0]
 
 
+def reduce_by_sum(embeddings: np.ndarray):
+    return embeddings.sum(0)
+
+
+def reduce_by_avg(embeddings: np.ndarray):
+    return embeddings.mean(0)
+
+
+reduction_function = {
+    'first': reduce_to_first,
+    'sum': reduce_by_sum,
+    'avg': reduce_by_avg
+}
+
 class EmbeddingExtractor:
     def __init__(self, embedding_reducer=reduce_to_first,
                  target_pos_set=frozenset({NOUN, ADJ, VERB, ADV})):

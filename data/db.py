@@ -3,8 +3,7 @@ from collections import namedtuple
 from typing import List, Iterable
 from itertools import count
 import logging
-
-
+from tqdm import tqdm
 import numpy as np
 import io
 
@@ -46,6 +45,7 @@ logger = logging.getLogger()
 
 class DbConnection:
     def __init__(self, run_name: str, db_name: str = DB_NAME, word_cache_size: int = 10000):
+        logger.info(f'Create database connection for run name {run_name}')
         self.run_name = run_name
         self.db_name = db_name
         self.con = None
@@ -75,8 +75,38 @@ class DbConnection:
         self.con = con
         self.cur = cur
 
-    def read_words(self, include_sentences: bool = False) -> Iterable[Word]:
-        ...
+    def read_words(self, include_sentences: bool = False, use_tqdm: bool = False) -> Iterable[Word]:
+        if self.con is None:
+            raise ConnectionError('Must initialize DB connection before reading')
+
+        word_total = self.cur.execute(f'SELECT COUNT(*) FROM {self.words_table}').fetchone()[0] if use_tqdm else None
+        lemma_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'lemma')
+        form_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'form')
+
+        def build_word(args: List) -> Word:
+            args = list(args)
+            if args[lemma_index] is None:
+                args[lemma_index] = args[form_index]
+
+            return Word(*args)
+
+        if include_sentences:
+            word_cursor = self.cur.execute(f'''
+                select {self.words_table}.*, {self.sents_table}.sent from {self.words_table}
+                join {self.sents_table} on {self.words_table}.sentence = {self.sents_table}.id
+                ''')
+
+            sent_idx = [description[0] for description in self.cur.description].index('sentence')
+
+            for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words with sentences'):
+                word_data = list(row[:len(word_attributes)])
+                word_data[sent_idx] = row[-1]  # the last element is the sentence text, use that to replace sentence ID
+                yield build_word(word_data)
+
+        else:
+            word_cursor = self.cur.execute(f'SELECT * from {self.words_table}')
+            for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
+                yield build_word(row)
 
     def add_words(self, words: Iterable[Word]):
         self.word_cache.extend(words)

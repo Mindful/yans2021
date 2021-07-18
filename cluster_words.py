@@ -5,25 +5,25 @@ from collections import defaultdict, namedtuple
 import numpy as np
 from tqdm import tqdm
 
-from embed_words import Word
+from data.db import DbConnection
 
 WordCluster = namedtuple('WordCluster', ['cluster', 'words'])
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--group_by', required=False, default='lemma')
+    parser.add_argument('--run', required=False, default='default')
 
     args = parser.parse_args()
 
-    with open(args.input, 'rb') as input_file:
-        all_words = pickle.load(input_file)
+    db = DbConnection(args.run)
+    db.connect_for_reading()
 
     groups = defaultdict(list)
 
-    for word in all_words:
+    for word in db.read_words(use_tqdm=True, include_sentences=False):
         key = getattr(word, args.group_by)
         groups[key].append(word)
 
@@ -40,6 +40,8 @@ def main():
 
     with open(args.output, 'wb') as outfile:
         pickle.dump(result_groups, outfile, protocol=5)
+
+    db.done()
 
 
 if __name__ == '__main__':
