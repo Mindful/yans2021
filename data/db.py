@@ -43,7 +43,7 @@ logger = logging.getLogger()
 
 
 class WriteBuffer:
-    def __init__(self, name: str, save_function: Callable, buffer_size: int = 100000):
+    def __init__(self, name: str, save_function: Callable, buffer_size: int = 2000000):
         self.name = name
         self.save_function = save_function
         self.buffer_size = buffer_size
@@ -76,6 +76,11 @@ class DbConnection:
         con = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
         self.con = con
+
+        self.con.execute('PRAGMA synchronous = 0')
+        self.con.execute('PRAGMA journal_mode = OFF')
+        self.con.execute('PRAGMA cache_size = 1000000')
+        self.con.execute('PRAGMA locking_mode = EXCLUSIVE')
         self.cur = cur
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS sentences{SENTENCE_TABLE_SCHEMA}')

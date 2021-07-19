@@ -10,18 +10,20 @@ from data.db import DbConnection, WriteBuffer
 from data.input import RawFileReader
 
 
-def to_sentences(dataset: datasets.Dataset) -> Iterable[str]:
+# a.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]}, remove_columns=['title', 'text'], num_proc=10)
+
+def to_sentences(dataset: datasets.Dataset) -> datasets.Dataset:
     nlp = spacy.load("en_core_web_md")
     nlp.add_pipe('sentencizer')
     nlp.select_pipes(enable='sentencizer')
 
-    for doc in nlp.pipe(example['text'] for example in dataset):
-        for sentence in doc.sents:
-            yield sentence.text
+    return dataset.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]},
+                       remove_columns=['title', 'text'], num_proc=10, batch_size=100)
+
 
 
 datasets_dict = {
-    'wiki': lambda: tqdm(to_sentences(datasets.load_dataset('wikipedia', '20200501.en')['train']))
+    'wiki': lambda: datasets.load_dataset('wikipedia', '20200501.en')['train']
 }
 
 
@@ -38,7 +40,10 @@ def main():
         logger.info(f'Reading sentences from file {args.input}')
         sentence_iter = RawFileReader(args.input)
     else:
-        sentence_iter = datasets_dict[args.input]()
+        dataset = datasets_dict[args.input]()
+        logger.info('Sentencizing dataset')
+        sentences_dataset = to_sentences(dataset)
+        sentence_iter = (sent for example in tqdm(sentences_dataset) for sent in example['sents'])
 
     db = DbConnection(args.run)
     write_buffer = WriteBuffer('sentence', db.save_sentences)
