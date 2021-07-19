@@ -1,6 +1,6 @@
 import sqlite3
 from collections import namedtuple
-from typing import List, Iterable, Tuple, Callable
+from typing import List, Iterable, Tuple, Callable, Optional
 from itertools import count
 import logging
 from tqdm import tqdm
@@ -80,20 +80,38 @@ class DbConnection:
         self.con.execute('PRAGMA synchronous = 0')
         self.con.execute('PRAGMA journal_mode = OFF')
         self.con.execute('PRAGMA cache_size = 1000000')
-        self.con.execute('PRAGMA locking_mode = EXCLUSIVE')
         self.cur = cur
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS sentences{SENTENCE_TABLE_SCHEMA}')
         self.con.commit()
 
-    def read_sentences(self, use_tqdm: bool = False) -> Iterable[Tuple[int, str]]:
-        sentences_total = self.cur.execute(f'SELECT COUNT(*) FROM sentences').fetchone()[0] if use_tqdm else None
-        for row in tqdm(self.cur.execute('SELECT * from sentences'), disable=not use_tqdm,
+    def count_sentences(self) -> int:
+        return self.cur.execute(f'SELECT COUNT(*) FROM sentences').fetchone()[0]
+
+    def read_sentences(self, use_tqdm: bool = False, bound: Optional[range] = None) -> Iterable[Tuple[int, str]]:
+        if bound is None:
+            sentences_total = self.count_sentences() if use_tqdm else None
+            where_clause = ''
+        else:
+            where_clause = f'where sentences.id >= {bound.start} and sentences.id < {bound.stop}'
+            sentences_total = len(bound)
+
+        for row in tqdm(self.cur.execute('SELECT * from sentences' + where_clause), disable=not use_tqdm,
                         total=sentences_total, desc='reading sentences'):
             yield row
 
-    def read_words(self, include_sentences: bool = False, use_tqdm: bool = False) -> Iterable[Word]:
-        word_total = self.cur.execute(f'SELECT COUNT(*) FROM words').fetchone()[0] if use_tqdm else None
+    def count_words(self) -> int:
+        return self.cur.execute(f'SELECT COUNT(*) FROM words').fetchone()[0]
+
+    def read_words(self, include_sentences: bool = False, use_tqdm: bool = False,
+                   bound: Optional[range] = None) -> Iterable[Word]:
+        if bound is None:
+            word_total = self.count_words() if use_tqdm else None
+            where_clause = ''
+        else:
+            where_clause = f'where words.id >= {bound.start} and words.id < {bound.stop}'
+            word_total = len(bound)
+
         lemma_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'lemma')
         form_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'form')
 
@@ -106,7 +124,7 @@ class DbConnection:
 
         if include_sentences:
             word_cursor = self.cur.execute(f'''select words.*, sentences.sent from words
-                                               join sentences on words.sentence = sentences.id''')
+                                               join sentences on words.sentence = sentences.id''' + where_clause)
 
             sent_idx = [description[0] for description in self.cur.description].index('sentence')
 
@@ -116,7 +134,7 @@ class DbConnection:
                 yield build_word(word_data)
 
         else:
-            word_cursor = self.cur.execute(f'SELECT * from words')
+            word_cursor = self.cur.execute(f'SELECT * from words' + where_clause)
             for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
                 yield build_word(row)
 

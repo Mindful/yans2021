@@ -4,12 +4,10 @@ import numpy as np
 import spacy
 from spacy.parts_of_speech import NOUN, ADJ, VERB, ADV
 from spacy.tokens import Doc, Token
-
 import torch
 
 using_gpu = torch.cuda.is_available()
 if using_gpu:
-    spacy.require_gpu(0)
     import cupy
 
 
@@ -30,6 +28,7 @@ reduction_function = {
     'sum': reduce_by_sum,
     'avg': reduce_by_avg
 }
+
 
 class EmbeddingExtractor:
     def __init__(self, embedding_reducer=reduce_to_first,
