@@ -73,7 +73,7 @@ class WriteBuffer:
 class DbConnection:
     def __init__(self, db_name: str):
         self.db_name = db_name + '.db'
-        con = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES)
+        con = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES,  timeout=600)
         cur = con.cursor()
         self.con = con
 
@@ -93,7 +93,7 @@ class DbConnection:
             sentences_total = self.count_sentences() if use_tqdm else None
             where_clause = ''
         else:
-            where_clause = f'where sentences.id >= {bound.start} and sentences.id < {bound.stop}'
+            where_clause = f' where sentences.id >= {bound.start} and sentences.id < {bound.stop}'
             sentences_total = len(bound)
 
         for row in tqdm(self.cur.execute('SELECT * from sentences' + where_clause), disable=not use_tqdm,
@@ -109,7 +109,7 @@ class DbConnection:
             word_total = self.count_words() if use_tqdm else None
             where_clause = ''
         else:
-            where_clause = f'where words.id >= {bound.start} and words.id < {bound.stop}'
+            where_clause = f' where words.id >= {bound.start} and words.id < {bound.stop}'
             word_total = len(bound)
 
         lemma_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'lemma')

@@ -4,11 +4,12 @@ import numpy as np
 import spacy
 from spacy.parts_of_speech import NOUN, ADJ, VERB, ADV
 from spacy.tokens import Doc, Token
-import torch
 
-using_gpu = torch.cuda.is_available()
-if using_gpu:
+try:
     import cupy
+    using_gpu = True
+except ModuleNotFoundError:
+    using_gpu = False
 
 
 def reduce_to_first(embeddings: np.ndarray):

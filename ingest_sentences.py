@@ -1,6 +1,5 @@
 import argparse
 import logging
-from typing import Iterable
 
 import datasets
 import spacy
@@ -10,8 +9,6 @@ from data.db import DbConnection, WriteBuffer
 from data.input import RawFileReader
 
 
-# a.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]}, remove_columns=['title', 'text'], num_proc=10)
-
 def to_sentences(dataset: datasets.Dataset) -> datasets.Dataset:
     nlp = spacy.load("en_core_web_md")
     nlp.add_pipe('sentencizer')
@@ -19,7 +16,6 @@ def to_sentences(dataset: datasets.Dataset) -> datasets.Dataset:
 
     return dataset.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]},
                        remove_columns=['title', 'text'], num_proc=10, batch_size=100)
-
 
 
 datasets_dict = {

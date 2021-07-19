@@ -10,10 +10,10 @@ from tqdm import tqdm
 
 from nlp.parsing import EmbeddingExtractor, reduction_function
 from data.db import DbConnection, Word, WriteBuffer
-import torch
 
 
 def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str, run: str):
+    logging.info(f'Acquiring GPU {process_num}')
     spacy.require_gpu(process_num)
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[reduction])
 
@@ -32,7 +32,9 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
 
         q.put(1)
 
+    logging.info(f'Proc {process_num} flushing buffer')
     write_buffer.flush()
+    logging.info(f'Proc {process_num} done')
 
 
 def main():
@@ -41,6 +43,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', required=False, default='default_run')
     parser.add_argument('--reduction', required=False, default='first')
+    parser.add_argument('--gpus', required=False, type=int, default=8)
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
     args = parser.parse_args()
@@ -50,10 +53,10 @@ def main():
     total_sents = db.count_sentences()
     logger.info(f'Found {total_sents} sentences')
 
-    devices = torch.cuda.device_count()
+    devices = args.gpus
     batch_size = total_sents // devices
     process_metadata = [
-        (idx, idx * batch_size, ((idx + 1) * batch_size) if idx != devices - 1 else total_sents)
+        (idx, idx * batch_size, ((idx + 1) * batch_size) if idx != devices - 1 else total_sents + 1)
         for idx in range(devices)
     ]
     q = Queue()
@@ -67,9 +70,12 @@ def main():
         proc.start()
 
     pbar = tqdm(total=total_sents, desc='processing sentences')
-    while pbar.n < total_sents:
+    counter = 0
+    while counter < total_sents:
         try:
-            pbar.update(q.get(timeout=10))
+            result = q.get(timeout=600)
+            pbar.update(1)
+            counter += 1
         except queue.Empty:
             logging.error('Empty queue')
             break
