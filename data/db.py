@@ -61,7 +61,7 @@ class WriteBuffer:
 
     def flush(self):
         items_to_save = self.buffer[:self.buffer_size]
-        logger.info(f'Saving {len(items_to_save)} f{self.name}s')
+        logger.info(f'Saving {len(items_to_save)} {self.name}s')
         self.save_function(items_to_save)
         self.buffer = self.buffer[self.buffer_size:]
 
@@ -93,7 +93,7 @@ class DbConnection:
         form_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'form')
 
         def build_word(args: List) -> Word:
-            args = list(args)
+            args = list(args)[1:]
             if args[lemma_index] is None:
                 args[lemma_index] = args[form_index]
 
