@@ -73,7 +73,7 @@ class WriteBuffer:
 class DbConnection:
     def __init__(self, db_name: str):
         self.db_name = db_name + '.db'
-        con = sqlite3.connect(db_name, detect_types=sqlite3.PARSE_DECLTYPES,  timeout=600)
+        con = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES,  timeout=600)
         cur = con.cursor()
         self.con = con
 

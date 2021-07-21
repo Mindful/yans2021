@@ -18,7 +18,7 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[reduction])
 
     db = DbConnection(run)
-    write_buffer = WriteBuffer('words', db.save_words)
+    write_buffer = WriteBuffer(f'proc {process_num} word', db.save_words)
 
     sentence_generator = ((text, ident) for ident, text in db.read_sentences(use_tqdm=False, bound=bound))
     for doc, ident in extractor.nlp.pipe(sentence_generator, batch_size=500, as_tuples=True):
@@ -58,6 +58,7 @@ def main():
         (idx, idx * batch_size, ((idx + 1) * batch_size) if idx != devices - 1 else total_sents + 1)
         for idx in range(devices)
     ]
+    logging.info(process_metadata)
     q = Queue()
 
     processes = [
