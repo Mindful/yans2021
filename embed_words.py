@@ -24,13 +24,17 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
         try:
             word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
-            for word in word_gen:
-                q.put(word)
+            q.put(list(word_gen))
         except Exception as e:
             print(doc)
             raise e
 
     logging.info(f'Proc {process_num} done')
+
+
+def write_executor(q: Queue, run: str):
+    db = DbConnection(run, write=True)
+
 
 
 def main():
@@ -71,13 +75,14 @@ def main():
     while counter < total_sents:
         try:
             result = q.get(timeout=600)
-            write_buffer.add(result)
+            write_buffer.add_many(result)
             pbar.update(1)
             counter += 1
         except queue.Empty:
             logging.error('Empty queue')
             break
 
+    write_buffer.flush()
     pbar.close()
     logging.info('Cleaning up')
 

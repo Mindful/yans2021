@@ -64,6 +64,7 @@ class WriteBuffer:
         logger.info(f'Saving {len(items_to_save)} {self.name}s')
         self.save_function(items_to_save)
         self.buffer = self.buffer[self.buffer_size:]
+        logger.info('Done saving')
 
     def __del__(self):
         if len(self.buffer) > 0:
@@ -71,11 +72,13 @@ class WriteBuffer:
 
 
 class DbConnection:
-    def __init__(self, db_name: str):
+    def __init__(self, db_name: str, write: bool = False):
         self.db_name = db_name + '.db'
-        con = sqlite3.connect(self.db_name, detect_types=sqlite3.PARSE_DECLTYPES,  timeout=600)
+        uri = f'file:{self.db_name}?mode={"rwc" if write else "ro"}'
+        con = sqlite3.connect(uri, uri=True, detect_types=sqlite3.PARSE_DECLTYPES,  timeout=600)
         cur = con.cursor()
         self.con = con
+        self.write = write
 
         self.con.execute('PRAGMA synchronous = 0')
         self.con.execute('PRAGMA journal_mode = OFF')
@@ -139,10 +142,14 @@ class DbConnection:
                 yield build_word(row)
 
     def save_sentences(self, sents: List[str]):
+        if not self.write:
+            raise RuntimeError('Cannot save sentences, DB object not in write mode')
         self.cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
         self.con.commit()
 
     def save_words(self, words: List[Word]) -> None:
+        if not self.write:
+            raise RuntimeError('Cannot save words, DB object not in write mode')
         self.cur.executemany(f'INSERT INTO words ({",".join(name for name, type_ in word_attributes)})'
                              f' values ({",".join("?" for x in word_attributes)})', words)
         self.con.commit()
