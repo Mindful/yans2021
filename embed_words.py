@@ -31,6 +31,8 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
             print(doc)
             raise e
 
+    write_buffer.flush()
+
     logging.info(f'Proc {process_num} done')
 
 
