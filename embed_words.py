@@ -32,11 +32,6 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
     logging.info(f'Proc {process_num} done')
 
 
-def write_executor(q: Queue, run: str):
-    db = DbConnection(run, write=True)
-
-
-
 def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
@@ -48,7 +43,7 @@ def main():
 
     args = parser.parse_args()
 
-    db = DbConnection(args.run)
+    db = DbConnection(args.run, write=True)
     logger.info('Counting sentences')
     total_sents = db.count_sentences()
     logger.info(f'Found {total_sents} sentences')
@@ -69,7 +64,7 @@ def main():
     for proc in processes:
         proc.start()
 
-    write_buffer = WriteBuffer('word', db.save_words)
+    write_buffer = WriteBuffer('word', db.save_words, buffer_size=500000)
     pbar = tqdm(total=total_sents, desc='processing sentences')
     counter = 0
     while counter < total_sents:

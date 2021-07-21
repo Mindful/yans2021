@@ -81,7 +81,10 @@ class DbConnection:
         self.write = write
 
         self.con.execute('PRAGMA synchronous = 0')
-        self.con.execute('PRAGMA journal_mode = WAL')  # enable simultaneous read-write
+        if write:
+            self.con.execute('PRAGMA journal_mode = WAL')  # enable simultaneous read-write
+        else:
+            self.con.execute('PRAGMA journal_mode = OFF')
         self.con.execute('PRAGMA cache_size = 1000000')
         self.cur = cur
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
