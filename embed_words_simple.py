@@ -18,7 +18,7 @@ def main():
 
     db = DbConnection(args.run)
     db_write = DbConnection(args.run, write=True)
-    write_buffer = WriteBuffer('word', db_write.save_words)
+    write_buffer = WriteBuffer('word', db_write.save_words, buffer_size=1)
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[args.reduction])
 
     sentence_generator = ((text, ident) for ident, text in db.read_sentences(use_tqdm=True))
@@ -26,6 +26,8 @@ def main():
         try:
             word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
+            # db.cur.close()
+            # db.con.close()
             write_buffer.add_many(word_gen)
         except Exception as e:
             logger.error('Failed processing doc')
