@@ -18,22 +18,18 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[reduction])
 
     db = DbConnection(run)
-    write_buffer = WriteBuffer('word', db.save_words)
 
     sentence_generator = ((text, ident) for ident, text in db.read_sentences(use_tqdm=False, bound=bound))
     for doc, ident in extractor.nlp.pipe(sentence_generator, batch_size=500, as_tuples=True):
         try:
             word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
-            write_buffer.add_many(word_gen)
+            for word in word_gen:
+                q.put(word)
         except Exception as e:
             print(doc)
             raise e
 
-        q.put(1)
-
-    logging.info(f'Proc {process_num} flushing buffer')
-    write_buffer.flush()
     logging.info(f'Proc {process_num} done')
 
 
@@ -69,11 +65,13 @@ def main():
     for proc in processes:
         proc.start()
 
+    write_buffer = WriteBuffer('word', db.save_words)
     pbar = tqdm(total=total_sents, desc='processing sentences')
     counter = 0
     while counter < total_sents:
         try:
             result = q.get(timeout=600)
+            write_buffer.add(result)
             pbar.update(1)
             counter += 1
         except queue.Empty:
