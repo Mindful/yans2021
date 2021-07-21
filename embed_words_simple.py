@@ -17,7 +17,7 @@ def main():
     args = parser.parse_args()
 
     db = DbConnection(args.run)
-    db_write = DbConnection(args.run, write=True)
+    db_write = DbConnection(args.run)
     write_buffer = WriteBuffer('word', db_write.save_words, buffer_size=1)
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[args.reduction])
 

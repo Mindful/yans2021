@@ -1,7 +1,6 @@
 import sqlite3
 from collections import namedtuple
 from typing import List, Iterable, Tuple, Callable, Optional
-from itertools import count
 import logging
 from tqdm import tqdm
 import numpy as np
@@ -43,7 +42,7 @@ logger = logging.getLogger()
 
 
 class WriteBuffer:
-    def __init__(self, name: str, save_function: Callable, buffer_size: int = 2000000):
+    def __init__(self, name: str, save_function: Callable, buffer_size: int = 500000):
         self.name = name
         self.save_function = save_function
         self.buffer_size = buffer_size
@@ -72,19 +71,14 @@ class WriteBuffer:
 
 
 class DbConnection:
-    def __init__(self, db_name: str, write: bool = False):
+    def __init__(self, db_name: str):
         self.db_name = db_name + '.db'
-        uri = f'file:{self.db_name}?mode={"rwc" if write else "ro"}'
-        con = sqlite3.connect(uri, uri=True, detect_types=sqlite3.PARSE_DECLTYPES,  timeout=600)
+        con = sqlite3.connect(db_name, detect_types=sqlite3.PARSE_DECLTYPES,  timeout=600)
         cur = con.cursor()
         self.con = con
-        self.write = write
 
         self.con.execute('PRAGMA synchronous = 0')
-        if write:
-            self.con.execute('PRAGMA journal_mode = WAL')  # enable simultaneous read-write
-        else:
-            self.con.execute('PRAGMA journal_mode = OFF')
+        self.con.execute('PRAGMA journal_mode = WAL')  # enable simultaneous read-write
         self.con.execute('PRAGMA cache_size = 1000000')
         self.cur = cur
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
@@ -145,14 +139,10 @@ class DbConnection:
                 yield build_word(row)
 
     def save_sentences(self, sents: List[str]):
-        if not self.write:
-            raise RuntimeError('Cannot save sentences, DB object not in write mode')
         self.cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
         self.con.commit()
 
     def save_words(self, words: List[Word]) -> None:
-        if not self.write:
-            raise RuntimeError('Cannot save words, DB object not in write mode')
         self.cur.executemany(f'INSERT INTO words ({",".join(name for name, type_ in word_attributes)})'
                              f' values ({",".join("?" for x in word_attributes)})', words)
         self.con.commit()
