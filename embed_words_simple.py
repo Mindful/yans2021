@@ -16,8 +16,8 @@ def main():
 
     args = parser.parse_args()
 
-    db = DbConnection(args.run)
-    db_write = DbConnection(args.run)
+    db = DbConnection(args.run + '_sentences')
+    db_write = DbConnection(args.run + '_words')
     write_buffer = WriteBuffer('word', db_write.save_words, buffer_size=1)
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[args.reduction])
 
@@ -26,8 +26,6 @@ def main():
         try:
             word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
-            # db.cur.close()
-            # db.con.close()
             write_buffer.add_many(word_gen)
         except Exception as e:
             logger.error('Failed processing doc')

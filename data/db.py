@@ -14,7 +14,7 @@ word_attributes = [
     ('embedding', 'ARRAY NOT NULL')
 ]
 Word = namedtuple('Word', [name for name, type_ in word_attributes])
-WORD_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + \
+WORD_TABLE_SCHEMA = '(' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + \
                     ', FOREIGN KEY (sentence) REFERENCES sentences (id) )'
 SENTENCE_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, sent TEXT NOT NULL)'
 
@@ -78,7 +78,7 @@ class DbConnection:
         self.con = con
 
         self.con.execute('PRAGMA synchronous = 0')
-        self.con.execute('PRAGMA journal_mode = WAL')  # enable simultaneous read-write
+        self.con.execute('PRAGMA journal_mode = OFF')
         self.con.execute('PRAGMA cache_size = 1000000')
         self.cur = cur
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')

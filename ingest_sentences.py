@@ -41,7 +41,7 @@ def main():
         sentences_dataset = to_sentences(dataset)
         sentence_iter = (sent for example in tqdm(sentences_dataset) for sent in example['sents'])
 
-    db = DbConnection(args.run)
+    db = DbConnection(args.run+'_sentences')
     write_buffer = WriteBuffer('sentence', db.save_sentences)
 
     for sentence in sentence_iter:
