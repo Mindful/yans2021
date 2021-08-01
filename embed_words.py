@@ -25,7 +25,7 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
         try:
             word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
-            q.put(list(word_gen))
+            q.put(list(word_gen), block=True, timeout=None)
         except Exception as e:
             print(doc)
             raise e
@@ -56,7 +56,10 @@ def main():
         for idx in range(devices)
     ]
     logging.info(process_metadata)
-    q = Queue()
+
+    writing_db = DbConnection(args.run + '_words')
+    buffer = WriteBuffer('word', writing_db.save_words)
+    q = Queue(buffer.buffer_size)  # don't let the que get larger than one full write buffer size
 
     processes = [
         Process(target=embedding_executor, args=(q, num, range(start, stop), args.reduction, args.run))
@@ -65,9 +68,6 @@ def main():
 
     for proc in processes:
         proc.start()
-
-    writing_db = DbConnection(args.run + '_words')
-    buffer = WriteBuffer('word', writing_db.save_words)
 
     pbar = tqdm(total=total_sents, desc='processing sentences')
     counter = 0
