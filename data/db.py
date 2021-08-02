@@ -14,8 +14,18 @@ word_attributes = [
     ('embedding', 'ARRAY NOT NULL')
 ]
 Word = namedtuple('Word', [name for name, type_ in word_attributes])
-WORD_TABLE_SCHEMA = '(' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + \
-                    ', FOREIGN KEY (sentence) REFERENCES sentences (id) )'
+WORD_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + ')'
+
+word_cluster_attributes = [
+    ('key', 'TEXT NOT NULL'),
+    ('cluster_centers', 'ARRAY NOT NULL'),
+    ('labels', 'ARRAY NOT NULL')
+]
+WordCluster = namedtuple('WordCluster', [name for name, type_ in word_cluster_attributes])
+CLUSTER_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_
+                                                               in word_cluster_attributes) + ')'
+
+
 SENTENCE_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, sent TEXT NOT NULL)'
 
 
@@ -83,6 +93,7 @@ class DbConnection:
         self.cur = cur
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS sentences{SENTENCE_TABLE_SCHEMA}')
+        self.cur.execute(f'CREATE TABLE IF NOT EXISTS clusters{CLUSTER_TABLE_SCHEMA}')
         self.con.commit()
 
     def count_sentences(self) -> int:
@@ -100,31 +111,35 @@ class DbConnection:
                         total=sentences_total, desc='reading sentences'):
             yield row
 
-    def count_words(self) -> int:
-        return self.cur.execute(f'SELECT COUNT(*) FROM words').fetchone()[0]
+    def count_words(self, where_clause: Optional[str] = None) -> int:
+        where_clause = '' if where_clause is None else where_clause
+        return self.cur.execute(f'SELECT COUNT(*) FROM words ' + where_clause).fetchone()[0]
+
+    def count_clusters(self, where_clause: Optional[str] = None) -> int:
+        where_clause = '' if where_clause is None else where_clause
+        return self.cur.execute(f'SELECT COUNT(*) FROM clusters ' + where_clause).fetchone()[0]
+
+    def read_clusters(self, use_tqdm: bool = False, where_clause: Optional[str] = None) -> Iterable[WordCluster]:
+        cluster_total = self.count_clusters(where_clause) if use_tqdm else None
+        where_clause = '' if where_clause is None else where_clause
+
+        for row in tqdm(self.cur.execute('SELECT * from clusters ' + where_clause), disable=not use_tqdm,
+                        total=cluster_total, desc='reading clusters'):
+            yield WordCluster(*row[1:])  # skip the first element, which is the ID
 
     def read_words(self, include_sentences: bool = False, use_tqdm: bool = False,
-                   bound: Optional[range] = None) -> Iterable[Word]:
-        if bound is None:
-            word_total = self.count_words() if use_tqdm else None
-            where_clause = ''
-        else:
-            where_clause = f' where words.id >= {bound.start} and words.id < {bound.stop}'
-            word_total = len(bound)
+                   where_clause: Optional[str] = None) -> Iterable[Word]:
 
-        lemma_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'lemma')
-        form_index = next(idx for idx, tpl in enumerate(word_attributes) if tpl[0] == 'form')
+        word_total = self.count_words(where_clause) if use_tqdm else None
+        where_clause = '' if where_clause is None else where_clause
 
         def build_word(args: List) -> Word:
-            args = list(args)[1:]
-            if args[lemma_index] is None:
-                args[lemma_index] = args[form_index]
-
+            #args = list(args)[1:] #TODO: uncomment when words have ids again
             return Word(*args)
 
         if include_sentences:
             word_cursor = self.cur.execute(f'''select words.*, sentences.sent from words
-                                               join sentences on words.sentence = sentences.id''' + where_clause)
+                                               join sentences on words.sentence = sentences.id ''' + where_clause)
 
             sent_idx = [description[0] for description in self.cur.description].index('sentence')
 
@@ -134,12 +149,19 @@ class DbConnection:
                 yield build_word(word_data)
 
         else:
-            word_cursor = self.cur.execute(f'SELECT * from words' + where_clause)
+            sql = f'SELECT * from words ' + where_clause
+            print(sql)
+            word_cursor = self.cur.execute(sql)
             for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
                 yield build_word(row)
 
     def save_sentences(self, sents: List[str]):
         self.cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
+        self.con.commit()
+
+    def save_clusters(self, clusters: List[WordCluster]):
+        self.cur.executemany(f'INSERT INTO clusters ({",".join(name for name, type_ in word_cluster_attributes)})'
+                             f' values ({",".join("?" for x in word_cluster_attributes)})', clusters)
         self.con.commit()
 
     def save_words(self, words: List[Word]) -> None:
