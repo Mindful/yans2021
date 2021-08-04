@@ -1,17 +1,12 @@
 # Examplify
 
 ```shell
-python embed_words.py --input ~/data/few_eng_sentences.txt --output embed_data.pkl
-python cluster_words.py --input embed_data.pkl --output cluster_data.pkl
-python search_embeddings.py --data cluster_data.pkl --input "Don't you like [chicken]?"
+python ingest_sentences.py --input wiki --run fw
+python embed_words.py --run fw
+./postprocess_data.sh fw
 ```
 
-
-
-# Eval
-
 ```shell
-python output_embeddings.py --wordlist built_wordlist.txt --data cluster_data.pkl --output word_embeds.txt 
-coda activate eval-wv
-python all_wordsim.py ~/data/word_embeds.txt data/word-sim/
+python cluster_by_key.py --run fw --key play
+python search_embeddings.py --run fw --input "I like to [play] the violin."
 ```

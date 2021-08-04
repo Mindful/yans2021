@@ -70,6 +70,7 @@ def main():
 
     assert len(words) == len(cluster.labels), f'Word count {len(words)} and label count {len(cluster.labels)} must match'
 
+    print("found", len(cluster.cluster_centers), "clusters")
     for cluster_label, cluster_centroid in zip(possible_labels, cluster.cluster_centers):
         examples = [word for word, label in zip(words, cluster.labels) if label == cluster_label]
 
@@ -82,16 +83,16 @@ def main():
             print('-----sorted by distance to centroid-----')
             examples_close_to_centroid = sort_words_by_distance(examples, cluster_centroid)
             for example in examples_close_to_centroid[0:5]:
-                print(example.sentence)
+                print(example.sentence.replace('\n', r"\n"))
 
             print('-----sorted by distance to input-----')
             examples_close_to_example = sort_words_by_distance(examples, cluster_centroid)
             for example in examples_close_to_example[0:5]:
-                print(example.sentence)
+                print(example.sentence.replace('\n', r"\n"))
 
         print('-----first cluster examples-----')
         for example in examples[0:5]:
-            print(example.sentence)
+            print(example.sentence.replace('\n', r"\n"))
 
 
 if __name__ == '__main__':

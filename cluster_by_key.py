@@ -51,7 +51,6 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output', required=True)
     parser.add_argument('--group_by', required=False, default='lemma')
     parser.add_argument('--run', required=False, default='default_run')
     parser.add_argument('--algo', required=False, choices=list(cluster_func_dict.keys()), default='dbscan')

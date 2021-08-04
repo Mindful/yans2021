@@ -133,7 +133,7 @@ class DbConnection:
         where_clause = '' if where_clause is None else where_clause
 
         def build_word(args: List) -> Word:
-            #args = list(args)[1:] #TODO: uncomment when words have ids again
+            args = list(args)[1:]
             return Word(*args)
 
         if include_sentences:
@@ -143,7 +143,7 @@ class DbConnection:
             sent_idx = [description[0] for description in self.cur.description].index('sentence')
 
             for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words with sentences'):
-                word_data = list(row[:len(word_attributes)])
+                word_data = list(row[:len(word_attributes)+1])
                 word_data[sent_idx] = row[-1]  # the last element is the sentence text, use that to replace sentence ID
                 yield build_word(word_data)
 
