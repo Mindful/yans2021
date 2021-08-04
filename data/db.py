@@ -52,7 +52,7 @@ logger = logging.getLogger()
 
 
 class WriteBuffer:
-    def __init__(self, name: str, save_function: Callable, buffer_size: int = 500000):
+    def __init__(self, name: str, save_function: Callable, buffer_size: int = 100000):
         self.name = name
         self.save_function = save_function
         self.buffer_size = buffer_size

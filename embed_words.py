@@ -2,7 +2,6 @@ import argparse
 import os
 import logging
 import queue
-import sqlite3
 
 import spacy
 from multiprocessing import Process, Queue
@@ -19,17 +18,21 @@ def embedding_executor(q: Queue, process_num: int, bound: range, reduction: str,
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[reduction])
 
     db = DbConnection(run + '_sentences')
+    writing_db = DbConnection(run + f'_words_{process_num}')
+    buffer = WriteBuffer(f'proc {process_num} word', writing_db.save_words)
 
     sentence_generator = ((text, ident) for ident, text in db.read_sentences(use_tqdm=False, bound=bound))
     for doc, ident in extractor.nlp.pipe(sentence_generator, batch_size=500, as_tuples=True):
         try:
             word_gen = (Word(token.text, token.lemma_, token.pos, ident, embedding)
                         for token, embedding in extractor.get_word_embeddings(doc))
-            q.put(list(word_gen), block=True, timeout=None)
+            buffer.add_many(word_gen)
+            q.put(1, block=True, timeout=None)
         except Exception as e:
             print(doc)
             raise e
 
+    buffer.flush()
     logging.info(f'Proc {process_num} done')
 
 
@@ -48,6 +51,8 @@ def main():
     logger.info('Counting sentences')
     total_sents = db.count_sentences()
     logger.info(f'Found {total_sents} sentences')
+    db.cur.close()
+    db.con.close()
 
     devices = args.gpus
     batch_size = total_sents // devices
@@ -57,9 +62,7 @@ def main():
     ]
     logging.info(process_metadata)
 
-    writing_db = DbConnection(args.run + '_words')
-    buffer = WriteBuffer('word', writing_db.save_words)
-    q = Queue(buffer.buffer_size)  # don't let the que get larger than one full write buffer size
+    q = Queue(10000)
 
     processes = [
         Process(target=embedding_executor, args=(q, num, range(start, stop), args.reduction, args.run))
@@ -71,12 +74,17 @@ def main():
 
     pbar = tqdm(total=total_sents, desc='processing sentences')
     counter = 0
+
+    que_full = False
     while counter < total_sents:
         try:
+            if not que_full and q.qsize() >= 10000:
+                que_full = True
+                print('------Queue filled up------')
+
             result = q.get(timeout=600)
-            buffer.add_many(result)
-            pbar.update(1)
-            counter += 1
+            pbar.update(result)
+            counter += result
         except queue.Empty:
             logging.error('Empty queue')
             break
