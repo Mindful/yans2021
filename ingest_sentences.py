@@ -14,8 +14,11 @@ def to_sentences(dataset: datasets.Dataset) -> datasets.Dataset:
     nlp.add_pipe('sentencizer')
     nlp.select_pipes(enable='sentencizer')
 
-    return dataset.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]},
-                       remove_columns=['title', 'text'], num_proc=10, batch_size=100)
+    # this filters out most of the data, but there's way too much garbage anyway
+    filtered_dataset = dataset.filter(lambda ex: '\nCategory' not in ex['text'])
+
+    return filtered_dataset.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]},
+                                remove_columns=['title', 'text'], num_proc=10, batch_size=100)
 
 
 datasets_dict = {
