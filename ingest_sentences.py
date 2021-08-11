@@ -16,7 +16,7 @@ def main():
 
     args = parser.parse_args()
 
-    seen_sents = BloomFilter(max_elements=100000000, error_rate=0.001)
+    seen_sents = BloomFilter(max_elements=200000000, error_rate=0.001)
 
     if '.txt' in args.input:
         logger.info(f'Reading sentences from file {args.input}')

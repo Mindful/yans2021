@@ -1,4 +1,7 @@
 # Examplify
+```shell
+wget https://dumps.wikimedia.org/other/cirrussearch/current/enwiki-20210802-cirrussearch-content.json.gz
+```
 
 ```shell
 python ingest_sentences.py --input wiki --run fw
