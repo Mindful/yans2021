@@ -26,7 +26,7 @@ def cluster_kmeans(key: str, words: List[Word]) -> WordCluster:
 
 def cluster_dbscan(key: str, words: List[Word]) -> WordCluster:
     embedding_array = np.stack([word.embedding for word in words])
-    dbscan = DBSCAN(eps=0.25, min_samples=100, metric='cosine').fit(embedding_array)
+    dbscan = DBSCAN(eps=0.25, min_samples=100, metric='euclidean').fit(embedding_array)
 
     label_groups = defaultdict(list)
     for word, label in zip(words, dbscan.labels_):
@@ -51,7 +51,6 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--group_by', required=False, default='lemma')
     parser.add_argument('--run', required=False, default='default_run')
     parser.add_argument('--algo', required=False, choices=list(cluster_func_dict.keys()), default='dbscan')
     parser.add_argument('--key', required=False)
@@ -64,14 +63,14 @@ def main():
     if args.key:
         keys = args.key.split(',')
         in_group = ', '.join([f"'{x}'" for x in keys])
-        where_clause = f'where {args.group_by} in ({in_group})'
+        where_clause = f'where lemma in ({in_group})'
     else:
         where_clause = None
 
     groups = defaultdict(list)
     logger.info('Reading words...')
     for word in db.read_words(use_tqdm=True, include_sentences=False, where_clause=where_clause):
-        key = getattr(word, args.group_by)
+        key = (word.lemma, word.pos)
         groups[key].append(word)
 
     logger.info(f'Found {len(groups)} groups to cluster')

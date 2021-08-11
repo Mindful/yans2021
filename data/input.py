@@ -1,5 +1,6 @@
 from itertools import takewhile, repeat
 
+import spacy
 from jsonlines import jsonlines
 from tqdm import tqdm
 
@@ -12,10 +13,10 @@ def fast_linecount(filename) -> int:
 
 
 class RawFileReader:
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, total_lines: int = None):
         self.filename = filename
         self.file = open(filename, 'r')
-        self.total_lines = fast_linecount(self.filename)
+        self.total_lines = fast_linecount(self.filename) if total_lines is None else total_lines
 
     def __iter__(self):
         for line in tqdm(self.file, desc=f'reading {self.filename}', total=self.total_lines):
@@ -26,13 +27,20 @@ class RawFileReader:
 
 
 class JsonFileReader:
-    def __init__(self, filename: str, text_key: str = 'text'):
+    def __init__(self, filename: str, text_key: str = 'text', total_lines: int = None):
         self.filename = filename
         self.file = jsonlines.open(filename, 'r')
-        self.total_lines = fast_linecount(self.filename)
+        self.total_lines = fast_linecount(self.filename) if total_lines is None else total_lines
         self.text_key = text_key
+
+        nlp = spacy.load("en_core_web_md")
+        nlp.add_pipe('sentencizer')
+        nlp.select_pipes(enable='sentencizer')
+
+        self.nlp = nlp
 
     def __iter__(self):
         for line in tqdm(self.file, desc=f'reading {self.filename}', total=self.total_lines):
             if self.text_key in line:
-                yield line[self.text_key].strip()
+                for sent in self.nlp(line[self.text_key]).sents:
+                    yield sent.text.strip()
