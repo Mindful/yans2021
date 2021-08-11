@@ -63,7 +63,7 @@ class EmbeddingExtractor:
                 token_embedding = embeddings[alignments.data[0, 0]:alignments.data[-1, 0] + 1]
                 if using_gpu:
                     token_embedding = cupy.asnumpy(token_embedding)  # move the array off the GPU
-                results.append((token, self.embedding_reducer(token_embedding)))
+                results.append((token, self.embedding_reducer(token_embedding).float16()))
 
         return results
 

@@ -15,7 +15,7 @@ class ClusteringException(Exception):
 
 
 def cluster_kmeans(key: str, words: List[Word]) -> WordCluster:
-    cluster_count = 2
+    cluster_count = 3
     embedding_array = np.stack([word.embedding for word in words])
     if embedding_array.shape[0] >= cluster_count:
         kmeans = KMeans(n_clusters=cluster_count, random_state=0).fit(embedding_array)
@@ -26,7 +26,7 @@ def cluster_kmeans(key: str, words: List[Word]) -> WordCluster:
 
 def cluster_dbscan(key: str, words: List[Word]) -> WordCluster:
     embedding_array = np.stack([word.embedding for word in words])
-    dbscan = DBSCAN(eps=0.1, min_samples=10, metric='cosine').fit(embedding_array)
+    dbscan = DBSCAN(eps=0.25, min_samples=100, metric='cosine').fit(embedding_array)
 
     label_groups = defaultdict(list)
     for word, label in zip(words, dbscan.labels_):
@@ -62,7 +62,9 @@ def main():
     db = DbConnection(args.run+'_words')
 
     if args.key:
-        where_clause = f'where {args.group_by}=\'{args.key}\''
+        keys = args.key.split(',')
+        in_group = ', '.join([f"'{x}'" for x in keys])
+        where_clause = f'where {args.group_by} in ({in_group})'
     else:
         where_clause = None
 

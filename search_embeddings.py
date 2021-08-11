@@ -14,6 +14,13 @@ from scipy.spatial.distance import cdist
 target_word_regex = re.compile(r'\[.+\]')
 
 
+def print_sentence(sentence: str):
+    if len(sentence) > 550:
+        sentence = sentence[:550] + ".....(cont)"
+
+    print(sentence.replace('\n', r"\n"))
+
+
 def get_target_embedding(text: str) -> Tuple[Token, np.ndarray]:
     # this assumes there's only one pair of brackets (if there are brackets before the regex match, -1 is wrong)
     match = next(target_word_regex.finditer(text))
@@ -70,29 +77,33 @@ def main():
 
     assert len(words) == len(cluster.labels), f'Word count {len(words)} and label count {len(cluster.labels)} must match'
 
+    unclustered = 0
     print("found", len(cluster.cluster_centers), "clusters")
     for cluster_label, cluster_centroid in zip(possible_labels, cluster.cluster_centers):
         examples = [word for word, label in zip(words, cluster.labels) if label == cluster_label]
+        if cluster_label == -1:
+            unclustered = len(examples)
 
         print()
         print('------------ cluster', cluster_label, '------------')
-        print(len(examples), 'total words in cluster')
+        print(len(examples), 'total words in cluster', str(100 * round(len(examples) / len(words), 2)) + "%")
         if cluster_label == target_label:
             print('<<MATCHING CLUSTER>>')
 
-            print('-----sorted by distance to centroid-----')
-            examples_close_to_centroid = sort_words_by_distance(examples, cluster_centroid)
-            for example in examples_close_to_centroid[0:5]:
-                print(example.sentence.replace('\n', r"\n"))
+        print('-----sorted by distance to centroid-----')
+        examples_close_to_centroid = sort_words_by_distance(examples, cluster_centroid)
+        for example in examples_close_to_centroid[0:5]:
+            print_sentence(example.sentence)
 
-            print('-----sorted by distance to input-----')
-            examples_close_to_example = sort_words_by_distance(examples, cluster_centroid)
-            for example in examples_close_to_example[0:5]:
-                print(example.sentence.replace('\n', r"\n"))
+        print('-----sorted by distance to input-----')
+        examples_close_to_example = sort_words_by_distance(examples, embedding)
+        for example in examples_close_to_example[0:5]:
+            print_sentence(example.sentence)
 
-        print('-----first cluster examples-----')
-        for example in examples[0:5]:
-            print(example.sentence.replace('\n', r"\n"))
+    if unclustered != 0:
+        print(unclustered, 'unclustered examples from', len(words), 'total examples:',
+              str(100 * round(unclustered / len(words), 2)) + "%", 'unclustered')
+
 
 
 if __name__ == '__main__':

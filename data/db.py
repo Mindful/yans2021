@@ -17,7 +17,7 @@ Word = namedtuple('Word', [name for name, type_ in word_attributes])
 WORD_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + ')'
 
 word_cluster_attributes = [
-    ('key', 'TEXT NOT NULL'),
+    ('key', 'TEXT NOT NULL UNIQUE'),
     ('cluster_centers', 'ARRAY NOT NULL'),
     ('labels', 'ARRAY NOT NULL')
 ]
@@ -149,7 +149,6 @@ class DbConnection:
 
         else:
             sql = f'SELECT * from words ' + where_clause
-            print(sql)
             word_cursor = self.cur.execute(sql)
             for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
                 yield build_word(row)
@@ -159,7 +158,8 @@ class DbConnection:
         self.con.commit()
 
     def save_clusters(self, clusters: List[WordCluster]):
-        self.cur.executemany(f'INSERT INTO clusters ({",".join(name for name, type_ in word_cluster_attributes)})'
+        self.cur.executemany(f'INSERT OR REPLACE INTO clusters '
+                             f'({",".join(name for name, type_ in word_cluster_attributes)})'
                              f' values ({",".join("?" for x in word_cluster_attributes)})', clusters)
         self.con.commit()
 

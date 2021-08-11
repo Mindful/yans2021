@@ -4,3 +4,6 @@ numpy
 sklearn
 torch
 datasets
+fastapi[all]
+jinja2
+aiofiles

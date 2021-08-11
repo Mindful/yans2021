@@ -1,0 +1,92 @@
+
+<head>
+    <title>Item Details</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+	<!-- Load plotly.js into the DOM -->
+	<script src='https://cdn.plot.ly/plotly-2.3.0.min.js'></script>
+	<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js'></script>
+</head>
+
+<body>
+	<div id='myDiv'><!-- Plotly chart will be drawn inside this DIV --></div>
+</body>
+
+<script>
+    function random_rgb() {
+        var o = Math.round, r = Math.random, s = 255;
+        return 'rgb(' + o(r()*s) + ',' + o(r()*s) + ',' + o(r()*s) + ',' + r().toFixed(1) + ')';
+    }
+
+    function unpack(rows, key) {
+        return rows.map(function(row) { return row[key]; });
+    }
+
+    function to_data(cluster) {
+        return {
+            x: unpack(cluster['data'], 'x'),
+            y: unpack(cluster['data'], 'y'),
+            z: unpack(cluster['data'], 'z'),
+            text: unpack(cluster['data'], 'text'),
+            mode: 'markers',
+            type: 'scatter3d',
+            name: cluster['name'],
+            hovertemplate: '%{text}',
+            marker: {
+              color: random_rgb(),
+              size: 20
+            }
+        }
+    }
+
+
+    d3.json("/clusters?word=dog", function(err, cluster_data){
+
+    var data = cluster_data['clusters'].map(to_data)
+
+    var layout = {
+        autosize: true,
+        height: 1200,
+        width: 1200,
+        scene: {
+            aspectratio: {
+                x: 1,
+                y: 1,
+                z: 1
+            },
+            camera: {
+                center: {
+                    x: 0,
+                    y: 0,
+                    z: 0
+                },
+                eye: {
+                    x: 1.25,
+                    y: 1.25,
+                    z: 1.25
+                },
+                up: {
+                    x: 0,
+                    y: 0,
+                    z: 1
+                }
+            },
+            xaxis: {
+                type: 'linear',
+                zeroline: false
+            },
+            yaxis: {
+                type: 'linear',
+                zeroline: false
+            },
+            zaxis: {
+                type: 'linear',
+                zeroline: false
+            }
+        },
+        title: '3d point clustering',
+    };
+
+    Plotly.newPlot('myDiv', data, layout);
+
+});
+</script>
