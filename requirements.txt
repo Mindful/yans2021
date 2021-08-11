@@ -7,3 +7,5 @@ datasets
 fastapi[all]
 jinja2
 aiofiles
+jsonlines
+bloom-filter2

@@ -1,4 +1,6 @@
 from itertools import takewhile, repeat
+
+from jsonlines import jsonlines
 from tqdm import tqdm
 
 
@@ -10,7 +12,6 @@ def fast_linecount(filename) -> int:
 
 
 class RawFileReader:
-
     def __init__(self, filename: str):
         self.filename = filename
         self.file = open(filename, 'r')
@@ -22,3 +23,16 @@ class RawFileReader:
 
     def __del__(self):
         self.file.close()
+
+
+class JsonFileReader:
+    def __init__(self, filename: str, text_key: str = 'text'):
+        self.filename = filename
+        self.file = jsonlines.open(filename, 'r')
+        self.total_lines = fast_linecount(self.filename)
+        self.text_key = text_key
+
+    def __iter__(self):
+        for line in tqdm(self.file, desc=f'reading {self.filename}', total=self.total_lines):
+            if self.text_key in line:
+                yield line[self.text_key].strip()

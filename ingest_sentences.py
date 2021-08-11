@@ -4,9 +4,10 @@ import logging
 import datasets
 import spacy
 from datasets import tqdm
+from bloom_filter2 import BloomFilter
 
 from data.db import DbConnection, WriteBuffer
-from data.input import RawFileReader
+from data.input import RawFileReader, JsonFileReader
 
 
 def to_sentences(dataset: datasets.Dataset) -> datasets.Dataset:
@@ -14,15 +15,14 @@ def to_sentences(dataset: datasets.Dataset) -> datasets.Dataset:
     nlp.add_pipe('sentencizer')
     nlp.select_pipes(enable='sentencizer')
 
-    # this filters out most of the data, but there's way too much garbage anyway
-    filtered_dataset = dataset.filter(lambda ex: '\nCategory' not in ex['text'])
-
-    return filtered_dataset.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]},
-                                remove_columns=['title', 'text'], num_proc=10, batch_size=100)
+    return dataset.map(lambda x: {'sents': [y.text for y in nlp(x['text']).sents]},
+                       remove_columns=['title', 'text'], num_proc=10, batch_size=100)
 
 
 datasets_dict = {
-    'wiki': lambda: datasets.load_dataset('wikipedia', '20200501.en')['train']
+    # raw HF wiki data has tons of garbage, not worth using
+    # cirusssearch dump is much better (and can be used with json reader)
+    'hf_wiki': lambda: datasets.load_dataset('wikipedia', '20200501.en')['train']
 }
 
 
@@ -35,9 +35,14 @@ def main():
 
     args = parser.parse_args()
 
-    if '.' in args.input:
+    seen_sents = BloomFilter(max_elements=100000000, error_rate=0.001)
+
+    if '.txt' in args.input:
         logger.info(f'Reading sentences from file {args.input}')
         sentence_iter = RawFileReader(args.input)
+    elif '.json' in args.input:
+        logger.info(f'Reading json file {args.input}')
+        sentence_iter = JsonFileReader(args.input)
     else:
         dataset = datasets_dict[args.input]()
         logger.info('Sentencizing dataset')
@@ -48,9 +53,12 @@ def main():
     write_buffer = WriteBuffer('sentence', db.save_sentences)
 
     for sentence in sentence_iter:
-        write_buffer.add(sentence)
+        if sentence not in seen_sents:
+            seen_sents.add(sentence)
+            write_buffer.add(sentence)
 
     write_buffer.flush()
+
 
 if __name__ == '__main__':
     main()
