@@ -171,7 +171,8 @@ class DbConnection:
         self.con.commit()
 
     def add_display_embedding_to_words(self, display_embedding_data: List[Tuple[int, np.ndarray]]):
-        self.cur.executemany('UPDATE words SET display_embedding = ? WHERE id = ?', display_embedding_data)
+        sql_data = [(embed, word_id) for word_id, embed in display_embedding_data]
+        self.cur.executemany('UPDATE words SET display_embedding = ? WHERE id = ?', sql_data)
         self.con.commit()
 
 

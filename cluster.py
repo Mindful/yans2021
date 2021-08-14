@@ -23,17 +23,17 @@ def compute_display_embeddings(word_data: List[Tuple[int, Word]]) -> List[Tuple[
     return list(zip((word_id for word_id, _ in word_data), display_embedding_array))
 
 
-def cluster_kmeans(key: str, words: List[Word]) -> WordCluster:
+def cluster_kmeans(lemma: str, pos: int, words: List[Word]) -> WordCluster:
     cluster_count = 3
     embedding_array = np.stack([word.embedding for word in words])
     if embedding_array.shape[0] >= cluster_count:
         kmeans = KMeans(n_clusters=cluster_count, random_state=0).fit(embedding_array)
-        return WordCluster(key, kmeans.cluster_centers_, kmeans.labels_)
+        return WordCluster(lemma, pos, kmeans.cluster_centers_, kmeans.labels_)
     else:
         raise ClusteringException('Insufficient number of embeddings')
 
 
-def cluster_dbscan(key: str, words: List[Word]) -> WordCluster:
+def cluster_dbscan(lemma: str, pos: int, words: List[Word]) -> WordCluster:
     embedding_array = np.stack([word.embedding for word in words])
     dbscan = DBSCAN(eps=0.25, min_samples=100, metric='euclidean').fit(embedding_array)
 
@@ -47,7 +47,7 @@ def cluster_dbscan(key: str, words: List[Word]) -> WordCluster:
     }
     cluster_averages = np.stack([embedding for _, embedding in sorted(cluster_averages.items(), key=lambda x: x[0])])
 
-    return WordCluster(key, cluster_averages, dbscan.labels_)
+    return WordCluster(lemma, pos, cluster_averages, dbscan.labels_)
 
 
 cluster_func_dict = {
@@ -61,7 +61,7 @@ def main():
     logger = logging.getLogger()
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', required=False, default='default_run')
-    parser.add_argument('--algo', required=False, choices=list(cluster_func_dict.keys()), default='dbscan')
+    parser.add_argument('--algo', required=False, choices=list(cluster_func_dict.keys()), default='kmeans')
     parser.add_argument('--key', required=False)
 
     args = parser.parse_args()
@@ -84,18 +84,17 @@ def main():
 
     logger.info(f'Found {len(groups)} groups to cluster')
 
-    write_db = DbConnection(args.run+'_clusters')
+    write_db = DbConnection(args.run)
 
     for key, word_data in tqdm(groups.items(), 'clustering word embeddings'):
         words = [word for word_id, word in word_data]
+        lemma, pos = key
         try:
-            write_db.save_clusters([cluster_function(key, words)])
+            write_db.save_clusters([cluster_function(lemma, pos, words)])
             display_embeddings = compute_display_embeddings(word_data)
-
+            write_db.add_display_embedding_to_words(display_embeddings)
         except ClusteringException as ex:
             logger.warning(f'Could not cluster key {key} due to {ex}')
-
-    write_buffer.flush()
 
 
 if __name__ == '__main__':
