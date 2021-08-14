@@ -9,3 +9,5 @@ jinja2
 aiofiles
 jsonlines
 bloom-filter2
+pydantic
+cachetools

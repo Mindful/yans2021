@@ -2,8 +2,11 @@ from typing import List, Tuple
 
 import numpy as np
 import spacy
+from scipy.spatial.distance import cdist
 from spacy.parts_of_speech import NOUN, ADJ, VERB, ADV
 from spacy.tokens import Doc, Token
+
+from data.db import WordCluster, Word
 
 try:
     import cupy
@@ -68,3 +71,17 @@ class EmbeddingExtractor:
         return results
 
 
+def classify_embedding(embedding: np.ndarray, clusters: WordCluster, metric: str = 'euclidean') -> int:
+    xa = np.expand_dims(embedding, axis=0)
+    xb = clusters.cluster_centers
+    distances = cdist(xa, xb, metric=metric)
+    return np.argmin(distances)
+
+
+def sort_words_by_distance(words: List[Word], vector: np.ndarray, metric: str = 'euclidian') -> List[Word]:
+    xa = np.stack([x.embedding for x in words])
+    xb = np.expand_dims(vector, axis=0)
+    distances = cdist(xa, xb, metric=metric)
+
+    words_with_index = list(enumerate(words))
+    return [word for _, word in sorted(words_with_index, key=lambda x: distances[x[0]])]

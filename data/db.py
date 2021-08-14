@@ -18,14 +18,14 @@ Word = namedtuple('Word', [name for name, type_ in word_attributes])
 WORD_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + ')'
 
 word_cluster_attributes = [
-    ('lemma', 'TEXT NOT NULL UNIQUE'),
+    ('lemma', 'TEXT NOT NULL'),
     ('pos', 'INT NOT NULL'),
     ('cluster_centers', 'ARRAY NOT NULL'),
     ('labels', 'ARRAY NOT NULL')
 ]
 WordCluster = namedtuple('WordCluster', [name for name, type_ in word_cluster_attributes])
 CLUSTER_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_
-                                                               in word_cluster_attributes) + ')'
+                                                               in word_cluster_attributes) + ', UNIQUE(lemma, pos))'
 
 
 SENTENCE_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, sent TEXT NOT NULL)'
@@ -127,6 +127,24 @@ class DbConnection:
         for row in tqdm(self.cur.execute('SELECT * from clusters ' + where_clause), disable=not use_tqdm,
                         total=cluster_total, desc='reading clusters'):
             yield WordCluster(*row[1:])  # skip the first element, which is the ID
+
+    def get_clusters_for_lemma(self, lemma: str) -> List[Tuple[WordCluster, List[Word]]]:
+        # this comes from user input so we can't use string formatting without risking SQL injection
+        # consequently, we can't use read_clusters or read_words
+        cluster_cursor = self.cur.execute('SELECT * from clusters where lemma = ?', (lemma,))
+        clusters = [WordCluster(*args[1:]) for args in cluster_cursor]
+
+        word_cursor = self.cur.execute(f'''select form, lemma, pos, sentences.sent, embedding, display_embedding from words
+                                           join sentences on words.sentence = sentences.id where lemma = ?''', (lemma,))
+        words = [Word(*x) for x in word_cursor]
+
+        results = [
+            (cluster, [word for word in words if word.pos == cluster.pos])
+            for cluster in clusters
+        ]
+
+        assert all(len(cluster.labels) == len(word_list) for cluster, word_list in results)
+        return results
 
     def read_words(self, include_sentences: bool = False, use_tqdm: bool = False,
                    where_clause: Optional[str] = None) -> Iterable[Tuple[int, Word]]:

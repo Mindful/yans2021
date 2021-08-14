@@ -1,15 +1,13 @@
 import argparse
 import logging
-from typing import Tuple, List
+from typing import Tuple
 import re
 
 from spacy.tokens import Token
 
-from data.db import DbConnection, Word
-from nlp.embedding import EmbeddingExtractor
-from cluster import WordCluster
+from data.db import DbConnection
+from nlp.embedding import EmbeddingExtractor, classify_embedding, sort_words_by_distance
 import numpy as np
-from scipy.spatial.distance import cdist
 
 target_word_regex = re.compile(r'\[.+\]')
 
@@ -32,22 +30,6 @@ def get_target_embedding(text: str) -> Tuple[Token, np.ndarray]:
     doc = extractor.nlp(cleaned_string)
     embeddings = extractor.get_word_embeddings(doc)
     return next((token, embedding) for token, embedding in embeddings if token.idx == target_start)
-
-
-def classify_embedding(embedding: np.ndarray, clusters: WordCluster) -> int:
-    xa = np.expand_dims(embedding, axis=0)
-    xb = clusters.cluster_centers
-    distances = cdist(xa, xb, metric='cosine')  # TODO:should be whatever we used to cluster, which for kmeans is euclid
-    return np.argmin(distances)
-
-
-def sort_words_by_distance(words: List[Word], vector: np.ndarray) -> List[Word]:
-    xa = np.stack([x.embedding for x in words])
-    xb = np.expand_dims(vector, axis=0)
-    distances = cdist(xa, xb, metric='cosine')  # TODO: again, metric should be selectable
-
-    words_with_index = list(enumerate(words))
-    return [word for _, word in sorted(words_with_index, key=lambda x: distances[x[0]])]
 
 
 def main():
