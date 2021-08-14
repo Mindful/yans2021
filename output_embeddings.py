@@ -4,7 +4,7 @@ from typing import Dict
 from collections import Counter
 import numpy as np
 
-from cluster_by_key import WordCluster
+from cluster import WordCluster
 from sklearn.cluster import KMeans
 
 

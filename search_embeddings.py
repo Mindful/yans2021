@@ -6,8 +6,8 @@ import re
 from spacy.tokens import Token
 
 from data.db import DbConnection, Word
-from nlp.parsing import EmbeddingExtractor
-from cluster_by_key import WordCluster
+from nlp.embedding import EmbeddingExtractor
+from cluster import WordCluster
 import numpy as np
 from scipy.spatial.distance import cdist
 

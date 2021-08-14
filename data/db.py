@@ -11,13 +11,15 @@ word_attributes = [
     ('lemma', 'TEXT NOT NULL'),
     ('pos', 'INT NOT NULL'),
     ('sentence', 'INT NOT NULL'),
-    ('embedding', 'ARRAY NOT NULL')
+    ('embedding', 'ARRAY NOT NULL'),
+    ('display_embedding', 'ARRAY')
 ]
 Word = namedtuple('Word', [name for name, type_ in word_attributes])
 WORD_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + ')'
 
 word_cluster_attributes = [
-    ('key', 'TEXT NOT NULL UNIQUE'),
+    ('lemma', 'TEXT NOT NULL UNIQUE'),
+    ('pos', 'INT NOT NULL'),
     ('cluster_centers', 'ARRAY NOT NULL'),
     ('labels', 'ARRAY NOT NULL')
 ]
@@ -168,6 +170,8 @@ class DbConnection:
                              f' values ({",".join("?" for x in word_attributes)})', words)
         self.con.commit()
 
+    def add_display_embedding_to_words(self, words: List[Word]):
+        ...
 
 
 

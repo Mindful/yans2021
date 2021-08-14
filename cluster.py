@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 from sklearn.cluster import KMeans, DBSCAN
+from sklearn.decomposition import PCA
 from collections import defaultdict
 import numpy as np
 from tqdm import tqdm
