@@ -1,6 +1,6 @@
 import argparse
 import logging
-from typing import List
+from typing import List, Tuple
 
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
@@ -13,6 +13,14 @@ from data.db import DbConnection, Word, WordCluster, WriteBuffer
 
 class ClusteringException(Exception):
     pass
+
+
+def compute_display_embeddings(word_data: List[Tuple[int, Word]]) -> List[Tuple[int, np.ndarray]]:
+    embedding_array = np.stack([word.embedding for _, word in word_data])
+    pca = PCA(n_components=3)
+    display_embedding_array = pca.fit_transform(embedding_array)
+
+    return list(zip((word_id for word_id, _ in word_data), display_embedding_array))
 
 
 def cluster_kmeans(key: str, words: List[Word]) -> WordCluster:
@@ -59,7 +67,7 @@ def main():
     args = parser.parse_args()
     cluster_function = cluster_func_dict[args.algo]
 
-    db = DbConnection(args.run+'_words')
+    db = DbConnection(args.run)
 
     if args.key:
         keys = args.key.split(',')
@@ -70,18 +78,20 @@ def main():
 
     groups = defaultdict(list)
     logger.info('Reading words...')
-    for word in db.read_words(use_tqdm=True, include_sentences=False, where_clause=where_clause):
+    for word_id, word in db.read_words(use_tqdm=True, include_sentences=False, where_clause=where_clause):
         key = (word.lemma, word.pos)
-        groups[key].append(word)
+        groups[key].append((word_id, word))
 
     logger.info(f'Found {len(groups)} groups to cluster')
 
     write_db = DbConnection(args.run+'_clusters')
-    write_buffer = WriteBuffer('cluster', write_db.save_clusters, buffer_size=5000)
 
-    for key, words in tqdm(groups.items(), 'clustering word embeddings'):
+    for key, word_data in tqdm(groups.items(), 'clustering word embeddings'):
+        words = [word for word_id, word in word_data]
         try:
-            write_buffer.add(cluster_function(key, words))
+            write_db.save_clusters([cluster_function(key, words)])
+            display_embeddings = compute_display_embeddings(word_data)
+
         except ClusteringException as ex:
             logger.warning(f'Could not cluster key {key} due to {ex}')
 

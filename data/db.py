@@ -129,7 +129,7 @@ class DbConnection:
             yield WordCluster(*row[1:])  # skip the first element, which is the ID
 
     def read_words(self, include_sentences: bool = False, use_tqdm: bool = False,
-                   where_clause: Optional[str] = None) -> Iterable[Word]:
+                   where_clause: Optional[str] = None) -> Iterable[Tuple[int, Word]]:
 
         word_total = self.count_words(where_clause) if use_tqdm else None
         where_clause = '' if where_clause is None else where_clause
@@ -147,13 +147,13 @@ class DbConnection:
             for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words with sentences'):
                 word_data = list(row[:len(word_attributes)+1])
                 word_data[sent_idx] = row[-1]  # the last element is the sentence text, use that to replace sentence ID
-                yield build_word(word_data)
+                yield word_data[0], build_word(word_data)
 
         else:
             sql = f'SELECT * from words ' + where_clause
             word_cursor = self.cur.execute(sql)
             for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
-                yield build_word(row)
+                yield row[0], build_word(row)
 
     def save_sentences(self, sents: List[str]):
         self.cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
@@ -170,8 +170,10 @@ class DbConnection:
                              f' values ({",".join("?" for x in word_attributes)})', words)
         self.con.commit()
 
-    def add_display_embedding_to_words(self, words: List[Word]):
-        ...
+    def add_display_embedding_to_words(self, display_embedding_data: List[Tuple[int, np.ndarray]]):
+        self.cur.executemany('UPDATE words SET display_embedding = ? WHERE id = ?', display_embedding_data)
+        self.con.commit()
+
 
 
 

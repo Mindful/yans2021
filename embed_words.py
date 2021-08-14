@@ -36,19 +36,24 @@ def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: se
 
     sentence_generator = ((text, ident) for ident, text in db.read_sentences(use_tqdm=False, bound=sentence_bound))
     for doc, ident in extractor.nlp.pipe(sentence_generator, batch_size=500, as_tuples=True):
-        if not instruction_queue.empty():
+        try:
             instruction = instruction_queue.get_nowait()
             if instruction == ABORT_INSTRUCTION:
                 logging.info(f'Proc {process_num} quitting early')
                 return
             else:  # it's a lemma we have more than enough of
                 banned_lemmas.add(instruction)
+        except queue.Empty:
+            pass
+
         try:
             word_gen = (Word(token.text, token.lemma_.lower(), token.pos, ident, embedding, None)
                         for token, embedding in extractor.get_word_embeddings(doc))
-            for word in word_gen:
-                if word.lemma not in banned_lemmas and (word.lemma in word_set or word.text.lower() in word_set):
-                    word_queue.put(1, block=True, timeout=None)
+
+            output_words = [word for word in word_gen if word.lemma not in banned_lemmas and
+                            (word.lemma in word_set or word.form.lower() in word_set)]
+
+            word_queue.put(output_words, block=True, timeout=None)
         except Exception as e:
             print(doc)
             raise e
@@ -106,21 +111,24 @@ def main():
     lemma_counter = Counter()
 
     while processed_words < MAX_TOTAL:
-        if not queue_has_filled and q.full():
+        if not queue_has_filled and q.qsize() > 10000:
             queue_has_filled = True
             print('------Queue filled up------')
 
-        word = q.get(timeout=600)
+        word_list = q.get(timeout=600)
 
-        lemma_counter[word.lemma] += 1
-        if lemma_counter[word.lemma] >= MAX_PER_LEMMA:
-            instruction_q.put(word.lemma)
-
-        write_buffer.add(word)
+        for word in word_list:
+            lemma_counter[word.lemma] += 1
+            if lemma_counter[word.lemma] >= MAX_PER_LEMMA:
+                instruction_q.put(word.lemma)
+                logging.info(f'Reached max count for lemma {word.lemma}')
+            else:
+                write_buffer.add(word)
         pbar.update(1)
         processed_words += 1
 
     pbar.close()
+    write_buffer.flush()
     logging.info('Cleaning up')
     instruction_q.put(ABORT_INSTRUCTION)
 

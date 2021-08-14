@@ -73,6 +73,7 @@ def main():
     possible_labels = sorted(set(cluster.labels))
 
     words_db = DbConnection(args.run+"_words")
+    #TODO: account for returned IDS
     words = list(words_db.read_words(include_sentences=True, use_tqdm=True, where_clause=f"where lemma='{key}'"))
 
     assert len(words) == len(cluster.labels), f'Word count {len(words)} and label count {len(cluster.labels)} must match'
