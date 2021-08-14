@@ -78,7 +78,7 @@ def classify_embedding(embedding: np.ndarray, clusters: WordCluster, metric: str
     return np.argmin(distances)
 
 
-def sort_words_by_distance(words: List[Word], vector: np.ndarray, metric: str = 'euclidian') -> List[Word]:
+def sort_words_by_distance(words: List[Word], vector: np.ndarray, metric: str = 'euclidean') -> List[Word]:
     xa = np.stack([x.embedding for x in words])
     xb = np.expand_dims(vector, axis=0)
     distances = cdist(xa, xb, metric=metric)
