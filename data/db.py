@@ -1,7 +1,11 @@
+import pickle
 import sqlite3
 from collections import namedtuple
 from typing import List, Iterable, Tuple, Callable, Optional
 import logging
+
+from sklearn.decomposition import PCA
+from spacy.tokens import Token
 from tqdm import tqdm
 import numpy as np
 import io
@@ -21,11 +25,13 @@ word_cluster_attributes = [
     ('lemma', 'TEXT NOT NULL'),
     ('pos', 'INT NOT NULL'),
     ('cluster_centers', 'ARRAY NOT NULL'),
-    ('labels', 'ARRAY NOT NULL')
+    ('labels', 'ARRAY NOT NULL'),
+    ('pca', 'PCA NOT NULL'),
+    ('tree', 'TEXT NOT NULL'),
 ]
 WordCluster = namedtuple('WordCluster', [name for name, type_ in word_cluster_attributes])
 CLUSTER_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, ' + ', '.join(f'{name} {type_}' for name, type_
-                                                               in word_cluster_attributes) + ', UNIQUE(lemma, pos))'
+                        in word_cluster_attributes) + ', UNIQUE(lemma, pos, tree))'
 
 
 SENTENCE_TABLE_SCHEMA = '(id INTEGER PRIMARY KEY, sent TEXT NOT NULL)'
@@ -45,10 +51,21 @@ def convert_array(text) -> np.ndarray:
     return np.load(out)
 
 
+def adapt_pca(pca: PCA) -> sqlite3.Binary:
+    return sqlite3.Binary(pickle.dumps(pca, pickle.HIGHEST_PROTOCOL))
+
+
+def convert_pca(data) -> PCA:
+    return pickle.loads(data)
+
+
 # Converts np.array to TEXT/BLOB when inserting
 sqlite3.register_adapter(np.ndarray, adapt_array)
 # Converts TEXT/BLOB to np.array when selecting
 sqlite3.register_converter("ARRAY", convert_array)
+
+sqlite3.register_adapter(PCA, adapt_pca)
+sqlite3.register_converter("PCA", convert_pca)
 
 logger = logging.getLogger()
 
@@ -128,23 +145,20 @@ class DbConnection:
                         total=cluster_total, desc='reading clusters'):
             yield WordCluster(*row[1:])  # skip the first element, which is the ID
 
-    def get_clusters_for_lemma(self, lemma: str) -> List[Tuple[WordCluster, List[Word]]]:
+    def get_cluster_for_token(self, token: Token) -> Tuple[WordCluster, List[Word]]:
         # this comes from user input so we can't use string formatting without risking SQL injection
         # consequently, we can't use read_clusters or read_words
-        cluster_cursor = self.cur.execute('SELECT * from clusters where lemma = ?', (lemma,))
-        clusters = [WordCluster(*args[1:]) for args in cluster_cursor]
+        cluster_cursor = self.cur.execute('SELECT * from clusters where lemma = ? and pos =?', (token.lemma_, token.pos))
+        cluster = WordCluster(*next(cluster_cursor)[1:])
 
-        word_cursor = self.cur.execute(f'''select form, lemma, pos, sentences.sent, embedding, display_embedding from words
-                                           join sentences on words.sentence = sentences.id where lemma = ?''', (lemma,))
+        word_cursor = self.cur.execute(f'''select form, lemma, pos, sentences.sent, embedding, display_embedding 
+        from words join sentences on words.sentence = sentences.id where lemma = ? and pos =?''',
+                                       (token.lemma_, token.pos))
+
         words = [Word(*x) for x in word_cursor]
 
-        results = [
-            (cluster, [word for word in words if word.pos == cluster.pos])
-            for cluster in clusters
-        ]
-
-        assert all(len(cluster.labels) == len(word_list) for cluster, word_list in results)
-        return results
+        assert len(cluster.labels) == len(words)
+        return cluster, words
 
     def read_words(self, include_sentences: bool = False, use_tqdm: bool = False,
                    where_clause: Optional[str] = None) -> Iterable[Tuple[int, Word]]:

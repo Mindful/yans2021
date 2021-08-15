@@ -59,7 +59,7 @@ def main():
     words = list(words_db.read_words(include_sentences=True, use_tqdm=True, where_clause=f"where lemma='{key}'"))
 
     assert len(words) == len(cluster.labels), f'Word count {len(words)} and label count {len(cluster.labels)} must match'
-
+    assert len(possible_labels) == len(cluster.cluster_centers), 'Label count and cluster center count must match'
     unclustered = 0
     print("found", len(cluster.cluster_centers), "clusters")
     for cluster_label, cluster_centroid in zip(possible_labels, cluster.cluster_centers):

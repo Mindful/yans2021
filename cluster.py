@@ -8,32 +8,32 @@ from collections import defaultdict
 import numpy as np
 from tqdm import tqdm
 
-from data.db import DbConnection, Word, WordCluster, WriteBuffer
+from data.db import DbConnection, Word, WordCluster
 
 
 class ClusteringException(Exception):
     pass
 
 
-def compute_display_embeddings(word_data: List[Tuple[int, Word]]) -> List[Tuple[int, np.ndarray]]:
+def compute_display_embeddings(word_data: List[Tuple[int, Word]]) -> Tuple[PCA, List[Tuple[int, np.ndarray]]]:
     embedding_array = np.stack([word.embedding for _, word in word_data])
     pca = PCA(n_components=3)
     display_embedding_array = pca.fit_transform(embedding_array)
 
-    return list(zip((word_id for word_id, _ in word_data), display_embedding_array))
+    return pca, list(zip((word_id for word_id, _ in word_data), display_embedding_array))
 
 
-def cluster_kmeans(lemma: str, pos: int, words: List[Word]) -> WordCluster:
+def cluster_kmeans(lemma: str, pos: int, words: List[Word], cluster_pca: PCA, tree: str = 'r') -> WordCluster:
     cluster_count = 3
     embedding_array = np.stack([word.embedding for word in words])
     if embedding_array.shape[0] >= cluster_count:
         kmeans = KMeans(n_clusters=cluster_count, random_state=0).fit(embedding_array)
-        return WordCluster(lemma, pos, kmeans.cluster_centers_, kmeans.labels_)
+        return WordCluster(lemma, pos, kmeans.cluster_centers_, kmeans.labels_, cluster_pca, tree)
     else:
         raise ClusteringException('Insufficient number of embeddings')
 
 
-def cluster_dbscan(lemma: str, pos: int, words: List[Word]) -> WordCluster:
+def cluster_dbscan(lemma: str, pos: int, words: List[Word], cluster_pca: PCA, tree: str = 'r') -> WordCluster:
     embedding_array = np.stack([word.embedding for word in words])
     dbscan = DBSCAN(eps=0.25, min_samples=100, metric='euclidean').fit(embedding_array)
 
@@ -47,7 +47,7 @@ def cluster_dbscan(lemma: str, pos: int, words: List[Word]) -> WordCluster:
     }
     cluster_averages = np.stack([embedding for _, embedding in sorted(cluster_averages.items(), key=lambda x: x[0])])
 
-    return WordCluster(lemma, pos, cluster_averages, dbscan.labels_)
+    return WordCluster(lemma, pos, cluster_averages, dbscan.labels_, cluster_pca, tree)
 
 
 cluster_func_dict = {
@@ -90,8 +90,8 @@ def main():
         words = [word for word_id, word in word_data]
         lemma, pos = key
         try:
-            write_db.save_clusters([cluster_function(lemma, pos, words)])
-            display_embeddings = compute_display_embeddings(word_data)
+            cluster_pca, display_embeddings = compute_display_embeddings(word_data)
+            write_db.save_clusters([cluster_function(lemma, pos, words, cluster_pca)])
             write_db.add_display_embedding_to_words(display_embeddings)
         except ClusteringException as ex:
             logger.warning(f'Could not cluster key {key} due to {ex}')
