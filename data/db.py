@@ -145,15 +145,15 @@ class DbConnection:
                         total=cluster_total, desc='reading clusters'):
             yield WordCluster(*row[1:])  # skip the first element, which is the ID
 
-    def get_cluster_for_token(self, token: Token) -> Tuple[WordCluster, List[Word]]:
+    def get_cluster_for_token(self, lemma: str, pos: int) -> Tuple[WordCluster, List[Word]]:
         # this comes from user input so we can't use string formatting without risking SQL injection
         # consequently, we can't use read_clusters or read_words
-        cluster_cursor = self.cur.execute('SELECT * from clusters where lemma = ? and pos =?', (token.lemma_, token.pos))
+        cluster_cursor = self.cur.execute('SELECT * from clusters where lemma = ? and pos =?', (lemma, pos))
         cluster = WordCluster(*next(cluster_cursor)[1:])
 
         word_cursor = self.cur.execute(f'''select form, lemma, pos, sentences.sent, embedding, display_embedding 
         from words join sentences on words.sentence = sentences.id where lemma = ? and pos =?''',
-                                       (token.lemma_, token.pos))
+                                       (lemma, pos))
 
         words = [Word(*x) for x in word_cursor]
 

@@ -41,6 +41,12 @@ const visualization_layout = {
     title: '3d point clustering',
 };
 
+const visualization_options = {
+    showTips: false
+}
+
+let search_state;
+
 function unpack(rows, key) {
     return rows.map(function (row) {
         return row[key];
@@ -59,7 +65,11 @@ function to_data(cluster) {
         hovertemplate: '%{text}',
         marker: {
             color: cluster['color'],
-            size: cluster['is_user_input'] ? 60 : 20
+            size: cluster['is_user_input'] ? 60 : 20,
+            line: {
+                color: 'rgb(231, 99, 250)',
+                width: cluster['is_user_input'] ? 6 : 0
+            }
         }
     }
 }
@@ -82,10 +92,34 @@ function validate_search_content (content) {
     return true
 }
 
+let visualization_initialized = false;
+
+function query_subcluster(cluster_number) {
+    let new_query_data = { ...search_state.search_data, tree: search_state.search_data.tree + "-" + cluster_number}
+    console.log(new_query_data)
+    fetch('/subcluster', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(new_query_data)
+    }).then(response => response.json()).then(data => draw_visualization(data))
+}
+
 function draw_visualization(json_data) {
+    search_state = json_data
     console.log(json_data)
     let data = json_data['clusters'].map(to_data)
-    Plotly.react('visualization', data, visualization_layout);
+    let vis_plot = document.getElementById('visualization')
+    Plotly.react('visualization', data, visualization_layout, visualization_options);
+
+    if (!visualization_initialized) {
+        vis_plot.on('plotly_legenddoubleclick', (event) => {
+            query_subcluster(event.curveNumber)
+            return false;
+        })
+        visualization_initialized = true;
+    }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -95,9 +129,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     search_form.addEventListener('submit', function (e) {
         if (validate_search_content(search_text_area.value)) {
-            fetch('/search?text='+search_text_area.value)
-                .then(response => response.json())
-                .then(data => draw_visualization(data))
+            fetch('/search?', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({'text': search_text_area.value})
+            }).then(response => response.json()).then(data => draw_visualization(data))
         }
         e.preventDefault()
         e.stopPropagation()
