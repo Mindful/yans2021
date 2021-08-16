@@ -42,7 +42,19 @@ const visualization_layout = {
 };
 
 const visualization_options = {
-    showTips: false
+    showTips: false,
+    modeBarButtons: [
+    [{
+            name: 'Up one level',
+            icon: Plotly.Icons.camera,
+            click: () => {
+                let parent_tree = search_state.search_data.tree.split('-')
+                parent_tree.pop()
+                query_cluster(parent_tree.join('-'))
+            }
+        }
+    ]
+]
 }
 
 let search_state;
@@ -94,8 +106,8 @@ function validate_search_content (content) {
 
 let visualization_initialized = false;
 
-function query_subcluster(cluster_number) {
-    let new_query_data = { ...search_state.search_data, tree: search_state.search_data.tree + "-" + cluster_number}
+function query_cluster(tree) {
+    let new_query_data = { ...search_state.search_data, tree: tree}
     console.log(new_query_data)
     fetch('/subcluster', {
         method: 'POST',
@@ -115,7 +127,7 @@ function draw_visualization(json_data) {
 
     if (!visualization_initialized) {
         vis_plot.on('plotly_legenddoubleclick', (event) => {
-            query_subcluster(event.curveNumber)
+            query_cluster(search_state.search_data.tree + "-" + event.curveNumber)
             return false;
         })
         visualization_initialized = true;

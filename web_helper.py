@@ -42,9 +42,12 @@ def get_data_for_search(text_input: str):
 
 
 #TODO: this currently only goes one cluster deep. to go deeper we need to save subclusters, and have a junction table
-#TODO: this doesn't seem to return sensible clusters. is using the old PCA bad, or are we returning garbage data somehow?
 def subcluster_search(search_data: ClusterSearchData):
-    parent_cluster, word_list = db.get_cluster_for_token(search_data.lemma, search_data.pos)
+    tree_data = search_data.tree.split('-')
+    if len(tree_data) > 2:
+        raise RuntimeError("Depths beyond 1 not currently supported")
+
+    parent_cluster, parent_word_list = db.get_cluster_for_token(search_data.lemma, search_data.pos)
     target_label = int(search_data.tree.split('-')[-1])
 
     # TODO: should we worry about the previously displayed sentences being in the new cluster?
@@ -53,16 +56,17 @@ def subcluster_search(search_data: ClusterSearchData):
     # words = sort_words_by_distance([word for word, word_label in zip(word_list, cluster.labels)
     #                                 if word_label == target_label], cluster.cluster_centers[target_label])
 
-    words = [word for word, word_label in zip(word_list, parent_cluster.labels) if word_label == target_label]
+    child_word_list = [word for word, word_label in zip(parent_word_list, parent_cluster.labels)
+                       if word_label == target_label]
 
-    child_cluster = cluster_kmeans(search_data.lemma, search_data.pos, words, parent_cluster.pca, search_data.tree)
+    child_cluster = cluster_kmeans(search_data.lemma, search_data.pos, child_word_list, parent_cluster.pca, search_data.tree)
 
     cluster_labels = sorted(set(child_cluster.labels))
     input_embedding = np.array(search_data.embedding)
     input_label = classify_embedding(input_embedding, child_cluster)
 
     words_by_cluster_label = {
-        label.item(): sort_words_by_distance([word for word, word_label in zip(word_list, child_cluster.labels)
+        label.item(): sort_words_by_distance([word for word, word_label in zip(child_word_list, child_cluster.labels)
                                               if word_label == label], centroid)
         for label, centroid in zip(cluster_labels, child_cluster.cluster_centers)
     }
@@ -71,7 +75,7 @@ def subcluster_search(search_data: ClusterSearchData):
 
 
 @lru_cache(maxsize=100)
-def compute_search_data(cleaned_text: str, target_start: int, display_limit: int = 50):
+def compute_search_data(cleaned_text: str, target_start: int):
     doc = extractor.nlp(cleaned_text)
     embeddings = extractor.get_word_embeddings(doc)
     token, embedding = next((token, embedding) for token, embedding in embeddings if token.idx == target_start)
