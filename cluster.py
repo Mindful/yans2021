@@ -8,19 +8,19 @@ from collections import defaultdict
 import numpy as np
 from tqdm import tqdm
 
-from data.db import DbConnection, Word, WordCluster
+from data.db import DbConnection, Word, WordCluster, ClusterWord
 
 
 class ClusteringException(Exception):
     pass
 
 
-def compute_display_embeddings(word_data: List[Tuple[int, Word]]) -> Tuple[PCA, List[Tuple[int, np.ndarray]]]:
-    embedding_array = np.stack([word.embedding for _, word in word_data])
+def compute_display_embeddings(word_data: List[Word]) -> Tuple[PCA, List[Tuple[int, np.ndarray]]]:
+    embedding_array = np.stack([word.embedding for word in word_data])
     pca = PCA(n_components=3)
     display_embedding_array = pca.fit_transform(embedding_array)
 
-    return pca, list(zip((word_id for word_id, _ in word_data), display_embedding_array))
+    return pca, list(zip((word.id for word in word_data), display_embedding_array))
 
 
 def cluster_kmeans(lemma: str, pos: int, words: List[Word], cluster_pca: PCA, tree: str = 'r') -> WordCluster:
@@ -28,7 +28,15 @@ def cluster_kmeans(lemma: str, pos: int, words: List[Word], cluster_pca: PCA, tr
     embedding_array = np.stack([word.embedding for word in words])
     if embedding_array.shape[0] >= cluster_count:
         kmeans = KMeans(n_clusters=cluster_count, random_state=0).fit(embedding_array)
-        return WordCluster(lemma, pos, kmeans.cluster_centers_, kmeans.labels_, cluster_pca, tree)
+
+        #TODO: this is ugly, clean it up somehow
+        if isinstance(words[0], ClusterWord):
+            clustered_words = [word._replace(cluster_label=int(label))
+                               for word, label in zip(words, kmeans.labels_)]
+        else:
+            clustered_words = [ClusterWord(*word, cluster_label=int(label))
+                               for word, label in zip(words, kmeans.labels_)]
+        return WordCluster(None, lemma, pos, kmeans.cluster_centers_, cluster_pca, tree, clustered_words)
     else:
         raise ClusteringException('Insufficient number of embeddings')
 
@@ -46,8 +54,9 @@ def cluster_dbscan(lemma: str, pos: int, words: List[Word], cluster_pca: PCA, tr
         label: np.mean(embeddings, axis=0) for label, embeddings in label_groups.items()
     }
     cluster_averages = np.stack([embedding for _, embedding in sorted(cluster_averages.items(), key=lambda x: x[0])])
+    clustered_words = [ClusterWord(*word, cluster_label=int(label)) for word, label in zip(words, dbscan.labels_)]
 
-    return WordCluster(lemma, pos, cluster_averages, dbscan.labels_, cluster_pca, tree)
+    return WordCluster(None, lemma, pos, cluster_averages, cluster_pca, tree, clustered_words)
 
 
 cluster_func_dict = {
@@ -78,20 +87,19 @@ def main():
 
     groups = defaultdict(list)
     logger.info('Reading words...')
-    for word_id, word in db.read_words(use_tqdm=True, include_sentences=False, where_clause=where_clause):
+    for word in db.read_words(use_tqdm=True, where_clause=where_clause):
         key = (word.lemma, word.pos)
-        groups[key].append((word_id, word))
+        groups[key].append(word)
 
     logger.info(f'Found {len(groups)} groups to cluster')
 
     write_db = DbConnection(args.run)
 
     for key, word_data in tqdm(groups.items(), 'clustering word embeddings'):
-        words = [word for word_id, word in word_data]
         lemma, pos = key
         try:
             cluster_pca, display_embeddings = compute_display_embeddings(word_data)
-            write_db.save_clusters([cluster_function(lemma, pos, words, cluster_pca)])
+            write_db.save_cluster(cluster_function(lemma, pos, word_data, cluster_pca))
             write_db.add_display_embedding_to_words(display_embeddings)
         except ClusteringException as ex:
             logger.warning(f'Could not cluster key {key} due to {ex}')

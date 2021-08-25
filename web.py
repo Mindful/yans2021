@@ -1,14 +1,9 @@
-import asyncio
-from itertools import cycle
-from typing import Tuple, List
-
-import numpy as np
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseSettings, BaseModel
-from web_helper import get_data_for_search, ClusterSearchData, subcluster_search
+from web_helper import compute_search_data, ClusterSearchData, subcluster_search
 
 
 class Settings(BaseSettings):
@@ -33,10 +28,7 @@ async def read_item(request: Request):
 
 @app.post("/search")
 async def cluster_data(request: SearchRequest):
-    data = get_data_for_search(request.text)
-    if len(data) == 0:
-        raise RuntimeError('No data for that word')
-    return data
+    return compute_search_data(request.text)
 
 
 @app.post('/subcluster')

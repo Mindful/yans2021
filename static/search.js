@@ -27,15 +27,18 @@ const visualization_layout = {
         },
         xaxis: {
             type: 'linear',
-            zeroline: false
+            zeroline: false,
+            showspikes: false,
         },
         yaxis: {
             type: 'linear',
-            zeroline: false
+            zeroline: false,
+            showspikes: false,
         },
         zaxis: {
             type: 'linear',
-            zeroline: false
+            zeroline: false,
+            showspikes: false,
         }
     },
     title: '3d point clustering',

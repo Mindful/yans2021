@@ -1,3 +1,4 @@
+import spacy
 from functools import lru_cache
 from itertools import cycle
 import re
@@ -8,7 +9,7 @@ from pydantic import BaseModel
 import numpy as np
 
 from spacy.parts_of_speech import NAMES
-from data.db import DbConnection, Word
+from data.db import DbConnection, Word, WordCluster
 from nlp.embedding import sort_words_by_distance, EmbeddingExtractor, classify_embedding
 from cluster import cluster_kmeans, cluster_dbscan
 
@@ -33,69 +34,61 @@ class ClusterSearchData(BaseModel):
     embedding: List[int]
 
 
-def get_data_for_search(text_input: str):
+def get_or_create_cluster(lemma: str, pos: int, tree: str) -> WordCluster:
+    cluster_from_db = db.get_cluster(lemma, pos, tree)
+    if cluster_from_db is None:
+        if tree == 'r':
+            raise RuntimeError(f'lemma/pos {lemma}/{pos} combination not present in database')
+
+        tree_data = tree.split('-')
+        target_label = int(tree_data[-1])
+        parent_tree = '-'.join(tree_data[:-1])
+
+        parent_cluster = db.get_cluster(lemma, pos, parent_tree)
+        if parent_cluster is None:
+            raise RuntimeError(f'could not find parent {lemma}/{pos}/{parent_tree}')
+
+        # TODO: should we worry about the previously displayed sentences being in the new cluster?
+        # if so, we want to sort the words by distance to the old cluster so we get teh same words, and then
+        # use those words plus another 2xcluster_size. either way there will be new sentences
+
+        child_word_list = [word for word in parent_cluster.words if word.cluster_label == target_label]
+        child_cluster = cluster_kmeans(lemma, pos, child_word_list, parent_cluster.pca, tree)
+        db.save_cluster(child_cluster)
+
+        return child_cluster
+    else:
+        return cluster_from_db
+
+
+def subcluster_search(search_data: ClusterSearchData):
+    child_cluster = get_or_create_cluster(search_data.lemma, search_data.pos, search_data.tree)
+
+    input_embedding = np.array(search_data.embedding)
+    input_label = classify_embedding(input_embedding, child_cluster)
+
+    return _format_output(search_data, child_cluster, input_label)
+
+
+@lru_cache(maxsize=100)
+def compute_search_data(text_input: str):
     match = next(target_word_regex.finditer(text_input))
     target_start = match.span()[0]
     cleaned_string = text_input.replace('[', '').replace(']', '')
 
-    return compute_search_data(cleaned_string, target_start)
-
-
-#TODO: this currently only goes one cluster deep. to go deeper we need to save subclusters, and have a junction table
-def subcluster_search(search_data: ClusterSearchData):
-    tree_data = search_data.tree.split('-')
-    if len(tree_data) > 2:
-        raise RuntimeError("Depths beyond 1 not currently supported")
-
-    parent_cluster, parent_word_list = db.get_cluster_for_token(search_data.lemma, search_data.pos)
-    target_label = int(search_data.tree.split('-')[-1])
-
-    # TODO: should we worry about the previously displayed sentences being in the new cluster?
-    # if so, we want to sort the words by distance to the old cluster so we get teh same words, and then
-    # use those words plus another 2xcluster_size. either way there will be new sentences
-    # words = sort_words_by_distance([word for word, word_label in zip(word_list, cluster.labels)
-    #                                 if word_label == target_label], cluster.cluster_centers[target_label])
-
-    child_word_list = [word for word, word_label in zip(parent_word_list, parent_cluster.labels)
-                       if word_label == target_label]
-
-    child_cluster = cluster_kmeans(search_data.lemma, search_data.pos, child_word_list, parent_cluster.pca, search_data.tree)
-
-    cluster_labels = sorted(set(child_cluster.labels))
-    input_embedding = np.array(search_data.embedding)
-    input_label = classify_embedding(input_embedding, child_cluster)
-
-    words_by_cluster_label = {
-        label.item(): sort_words_by_distance([word for word, word_label in zip(child_word_list, child_cluster.labels)
-                                              if word_label == label], centroid)
-        for label, centroid in zip(cluster_labels, child_cluster.cluster_centers)
-    }
-
-    return _format_output(search_data, words_by_cluster_label, cluster_labels, input_label)
-
-
-@lru_cache(maxsize=100)
-def compute_search_data(cleaned_text: str, target_start: int):
-    doc = extractor.nlp(cleaned_text)
+    doc = extractor.nlp(cleaned_string)
     embeddings = extractor.get_word_embeddings(doc)
     token, embedding = next((token, embedding) for token, embedding in embeddings if token.idx == target_start)
 
-    cluster, word_list = db.get_cluster_for_token(token.lemma_, token.pos)
-    cluster_labels = sorted(set(cluster.labels))
+    cluster = db.get_cluster(token.lemma_, token.pos, 'r')
     input_label = classify_embedding(embedding, cluster)
     input_display_embedding = cluster.pca.transform(np.expand_dims(embedding, axis=0)).squeeze()
-
-    words_by_cluster_label = {
-        label.item(): sort_words_by_distance([word for word, word_label in zip(word_list, cluster.labels)
-                                              if word_label == label], centroid)
-        for label, centroid in zip(cluster_labels, cluster.cluster_centers)
-    }
 
     search_data = ClusterSearchData(
         lemma=cluster.lemma,
         pos=cluster.pos,
         tree=cluster.tree,
-        sentence=cleaned_text,
+        sentence=cleaned_string,
         word_start=token.idx,
         word_end=token.idx + len(token),
         word=token.text,
@@ -103,12 +96,17 @@ def compute_search_data(cleaned_text: str, target_start: int):
         embedding=list(embedding),
     )
 
-    return _format_output(search_data, words_by_cluster_label, cluster_labels, input_label)
+    return _format_output(search_data, cluster, input_label)
 
 
-def _format_output(search_data: ClusterSearchData, words_by_cluster_label: Dict[int, List[Word]],
-                   cluster_labels: List[int], input_label: int, display_limit: int = 50):
-    cluster_colors = [next(cluster_color_iter) for _ in cluster_labels]
+def _format_output(search_data: ClusterSearchData, cluster: WordCluster, input_label: int, display_limit: int = 50):
+
+    words_by_cluster_label = {
+        label: sort_words_by_distance([word for word in cluster.words if word.cluster_label == label], centroid)
+        for label, centroid in zip(cluster.labels, cluster.cluster_centers)
+    }
+
+    cluster_colors = [next(cluster_color_iter) for _ in cluster.labels]
 
     return {'clusters': [
         {
@@ -140,5 +138,5 @@ def _format_output(search_data: ClusterSearchData, words_by_cluster_label: Dict[
 
 
 if __name__ == '__main__':
-    d = get_data_for_search('I like to [play].')
+    d = db.get_cluster('play', spacy.parts_of_speech.VERB, 'r')
     print(d)
