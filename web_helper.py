@@ -11,7 +11,7 @@ import numpy as np
 from spacy.parts_of_speech import NAMES
 from data.db import DbConnection, Word, WordCluster
 from nlp.embedding import sort_words_by_distance, EmbeddingExtractor, classify_embedding
-from cluster import cluster_kmeans, cluster_dbscan
+from cluster import cluster_kmeans, cluster_dbscan, compute_display_embeddings
 
 db = DbConnection('css')
 extractor = EmbeddingExtractor()
@@ -34,11 +34,25 @@ class ClusterSearchData(BaseModel):
     embedding: List[int]
 
 
+def create_new_cluster(lemma, pos) -> WordCluster:
+    word_data = list(db.read_words(where_clause=f"WHERE lemma='{lemma}' and pos={pos}"))
+    if len(word_data) == 0:
+        raise RuntimeError(f'{lemma}/{pos} not found in database')
+
+    cluster_pca, display_embeddings = compute_display_embeddings(word_data)
+    cluster = cluster_kmeans(lemma, pos, word_data, cluster_pca)
+    db.save_cluster(cluster)
+    db.add_display_embedding_to_words(display_embeddings)
+
+    # we need sentences and display embeddings, so we reload the words along with the cluster
+    return db.get_cluster(lemma, pos, 'r')
+
+
 def get_or_create_cluster(lemma: str, pos: int, tree: str) -> WordCluster:
     cluster_from_db = db.get_cluster(lemma, pos, tree)
     if cluster_from_db is None:
         if tree == 'r':
-            raise RuntimeError(f'lemma/pos {lemma}/{pos} combination not present in database')
+            return create_new_cluster(lemma, pos)
 
         tree_data = tree.split('-')
         target_label = int(tree_data[-1])
@@ -80,7 +94,7 @@ def compute_search_data(text_input: str):
     embeddings = extractor.get_word_embeddings(doc)
     token, embedding = next((token, embedding) for token, embedding in embeddings if token.idx == target_start)
 
-    cluster = db.get_cluster(token.lemma_, token.pos, 'r')
+    cluster = get_or_create_cluster(token.lemma_, token.pos, 'r')
     input_label = classify_embedding(embedding, cluster)
     input_display_embedding = cluster.pca.transform(np.expand_dims(embedding, axis=0)).squeeze()
 
@@ -138,5 +152,5 @@ def _format_output(search_data: ClusterSearchData, cluster: WordCluster, input_l
 
 
 if __name__ == '__main__':
-    d = db.get_cluster('play', spacy.parts_of_speech.VERB, 'r')
+    d = create_new_cluster('dog', spacy.parts_of_speech.VERB)
     print(d)
