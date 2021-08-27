@@ -120,11 +120,16 @@ def _format_output(search_data: ClusterSearchData, cluster: WordCluster, input_l
         for label, centroid in zip(cluster.labels, cluster.cluster_centers)
     }
 
+    closest_to_input = sort_words_by_distance(cluster.words, np.array(search_data.embedding))
+
     cluster_colors = [next(cluster_color_iter) for _ in cluster.labels]
+    tree_suffix = '-'.join(search_data.tree.split('-')[1:])
+    if len(tree_suffix) > 0:
+        tree_suffix = '-' + tree_suffix
 
     return {'clusters': [
         {
-            'name': f'({NAMES[search_data.pos]}) {search_data.lemma} {label}',
+            'name': f'{search_data.lemma}{tree_suffix}-{label}',
             'data': [
                         {'x': word.display_embedding[0].item(),
                          'y': word.display_embedding[1].item(),
@@ -136,7 +141,7 @@ def _format_output(search_data: ClusterSearchData, cluster: WordCluster, input_l
             'is_user_input': False
         } for label, cluster_words in words_by_cluster_label.items()
     ] + [{
-        'name': f'({NAMES[search_data.pos]}) {search_data.lemma} input',
+        'name': f'Input',
         'data': [
             {'x': search_data.display_embedding[0],
              'y': search_data.display_embedding[1],
@@ -147,6 +152,13 @@ def _format_output(search_data: ClusterSearchData, cluster: WordCluster, input_l
         'is_user_input': True
 
     }],
+        'similar_sentences': [
+            {
+                'text': word.sentence,
+                'cluster': word.cluster_label
+            } for word in closest_to_input[:display_limit]
+        ],
+        'title': f'Clusters for {search_data.lemma}{tree_suffix} ({NAMES[search_data.pos]})',
         'search_data': search_data.dict()
     }
 

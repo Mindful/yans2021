@@ -17,7 +17,7 @@
     <title>Word Vector Search</title>
 </head>
 <body>
-<div class="container">
+<div class="container-fluid" style="padding: 40px">
 <form id="search_form">
     <div class="mb-3">
         <label for="search_text_area" class="form-label">Example textarea</label>
@@ -26,7 +26,35 @@
     <button type="submit" class="btn btn-primary">Submit</button>
 </form>
 
-<div id='visualization'><!-- Plotly chart will be drawn inside this DIV --></div>
+  <div class="row" style="padding-top: 25px">
+    <div class="col-6">
+        <div class="card" id="list_card" style="display: none;">
+          <div class="card-header">
+            Examples most similar to input
+          </div>
+          <div class="card-body">
+                <ul class="list-group list-group-flush" id="sentence_list" style="
+                    max-height: 800px;
+                    margin-bottom: 10px;
+                    overflow:scroll;
+                    -webkit-overflow-scrolling: touch;">
+                </ul>
+          </div>
+        </div>
+    </div>
+    <div class="col-6">
+        <div class="card" id="vis_card" style="display: none;">
+          <div class="card-header">
+            Sense clusters
+          </div>
+          <div class="card-body">
+            <div id='visualization'><!-- Plotly chart will be drawn inside this DIV --></div>
+          </div>
+        </div>
+    </div>
+  </div>
+
+
 </div>
 
 

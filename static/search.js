@@ -1,7 +1,6 @@
 const visualization_layout = {
-    autosize: true,
-    height: 1200,
-    width: 1200,
+    height: 800,
+    width: 800,
     scene: {
         aspectratio: {
             x: 1,
@@ -15,9 +14,9 @@ const visualization_layout = {
                 z: 0
             },
             eye: {
-                x: 1.25,
-                y: 1.25,
-                z: 1.25
+                x: 1,
+                y: 1,
+                z: 1
             },
             up: {
                 x: 0,
@@ -41,7 +40,7 @@ const visualization_layout = {
             showspikes: false,
         }
     },
-    title: '3d point clustering',
+    title: 'Clustering',
 };
 
 const visualization_options = {
@@ -77,10 +76,11 @@ function to_data(cluster) {
         mode: 'markers',
         type: 'scatter3d',
         name: cluster['name'],
+        showlegend: true, //TODO: if not centroid
         hovertemplate: '%{text}',
         marker: {
             color: cluster['color'],
-            size: cluster['is_user_input'] ? 60 : 20,
+            size: cluster['is_user_input'] ? 30 : 20,
             line: {
                 color: 'rgb(231, 99, 250)',
                 width: cluster['is_user_input'] ? 6 : 0
@@ -118,19 +118,38 @@ function query_cluster(tree) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify(new_query_data)
-    }).then(response => response.json()).then(data => draw_visualization(data))
+    }).then(response => response.json()).then(data => display_data(data))
 }
 
-function draw_visualization(json_data) {
+function truncate(str, n){
+  return (str.length > n) ? str.substr(0, n-1) + '&hellip;' : str;
+};
+
+function populate_sentence_list(json_data) {
+    let sentences = json_data['similar_sentences']
+    let html = sentences.map((sent) => '<li class="list-group-item d-flex justify-content-between align-items-center"> ' +
+        truncate(sent.text, 300) + '<span>' + sent.cluster + '</span></li>').join('\n')
+
+    document.getElementById("sentence_list").innerHTML = html
+}
+
+
+function display_data(json_data) {
     search_state = json_data
-    console.log(json_data)
     let data = json_data['clusters'].map(to_data)
     let vis_plot = document.getElementById('visualization')
-    Plotly.react('visualization', data, visualization_layout, visualization_options);
+
+    let layout = { ...visualization_layout, title: search_state['title']}
+    Plotly.react('visualization', data, layout, visualization_options);
+    populate_sentence_list(json_data)
 
     if (!visualization_initialized) {
+        document.getElementById('vis_card').style.display = ''
+        document.getElementById('list_card').style.display = ''
         vis_plot.on('plotly_legenddoubleclick', (event) => {
-            query_cluster(search_state.search_data.tree + "-" + event.curveNumber)
+            if (event.curveNUmber != 4) { //TODO: shouldn't be hardcoded to 4 (depends on cluster count)
+                query_cluster(search_state.search_data.tree + "-" + event.curveNumber)
+            }
             return false;
         })
         visualization_initialized = true;
@@ -150,7 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({'text': search_text_area.value})
-            }).then(response => response.json()).then(data => draw_visualization(data))
+            }).then(response => response.json()).then(data => display_data(data))
         }
         e.preventDefault()
         e.stopPropagation()
