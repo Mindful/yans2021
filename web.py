@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseSettings, BaseModel
-from web_helper import compute_search_data, ClusterSearchData, subcluster_search
+from helpers import compute_search_data, ClusterSearchData, subcluster_search
 
 
 class Settings(BaseSettings):

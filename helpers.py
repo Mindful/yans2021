@@ -7,10 +7,11 @@ from typing import List, Dict
 from pydantic import BaseModel
 
 import numpy as np
+from scipy.spatial.distance import cdist
 
 from spacy.parts_of_speech import NAMES
 from data.db import DbConnection, Word, WordCluster
-from nlp.embedding import sort_words_by_distance, EmbeddingExtractor, classify_embedding
+from nlp.embedding import EmbeddingExtractor
 from cluster import cluster_kmeans, cluster_dbscan, compute_display_embeddings
 
 db = DbConnection('css')
@@ -18,6 +19,10 @@ extractor = EmbeddingExtractor()
 
 target_word_regex = re.compile(r'\[.+\]')
 cluster_color_iter = cycle(('rgb(0, 59, 27)', 'rgb(186, 83, 19)', 'rgb(110, 46, 5)'))
+
+
+class ClusterConstructionError(RuntimeError):
+    pass
 
 
 class ClusterSearchData(BaseModel):
@@ -37,7 +42,7 @@ class ClusterSearchData(BaseModel):
 def create_new_cluster(lemma, pos) -> WordCluster:
     word_data = list(db.read_words(where_clause=f"WHERE lemma='{lemma}' and pos={pos}"))
     if len(word_data) == 0:
-        raise RuntimeError(f'{lemma}/{pos} not found in database')
+        raise ClusterConstructionError(f'{lemma}/{pos} not found in database')
 
     cluster_pca, display_embeddings = compute_display_embeddings(word_data)
     cluster = cluster_kmeans(lemma, pos, word_data, cluster_pca)
@@ -60,7 +65,7 @@ def get_or_create_cluster(lemma: str, pos: int, tree: str) -> WordCluster:
 
         parent_cluster = db.get_cluster(lemma, pos, parent_tree)
         if parent_cluster is None:
-            raise RuntimeError(f'could not find parent {lemma}/{pos}/{parent_tree}')
+            raise ClusterConstructionError(f'could not find parent {lemma}/{pos}/{parent_tree}')
 
         # TODO: should we worry about the previously displayed sentences being in the new cluster?
         # if so, we want to sort the words by distance to the old cluster so we get teh same words, and then
@@ -166,3 +171,19 @@ def _format_output(search_data: ClusterSearchData, cluster: WordCluster, input_l
 if __name__ == '__main__':
     d = create_new_cluster('dog', spacy.parts_of_speech.VERB)
     print(d)
+
+
+def classify_embedding(embedding: np.ndarray, clusters: WordCluster, metric: str = 'euclidean') -> int:
+    xa = np.expand_dims(embedding, axis=0)
+    xb = clusters.cluster_centers
+    distances = cdist(xa, xb, metric=metric)
+    return np.argmin(distances)
+
+
+def sort_words_by_distance(words: List[Word], vector: np.ndarray, metric: str = 'euclidean') -> List[Word]:
+    xa = np.stack([x.embedding for x in words])
+    xb = np.expand_dims(vector, axis=0)
+    distances = cdist(xa, xb, metric=metric)
+
+    words_with_index = list(enumerate(words))
+    return [word for _, word in sorted(words_with_index, key=lambda x: distances[x[0]])]

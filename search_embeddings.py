@@ -6,7 +6,8 @@ import re
 from spacy.tokens import Token
 
 from data.db import DbConnection
-from nlp.embedding import EmbeddingExtractor, classify_embedding, sort_words_by_distance
+from nlp.embedding import EmbeddingExtractor
+from helpers import classify_embedding, sort_words_by_distance
 import numpy as np
 
 target_word_regex = re.compile(r'\[.+\]')
