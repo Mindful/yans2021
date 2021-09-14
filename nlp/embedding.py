@@ -51,7 +51,7 @@ class EmbeddingExtractor:
         trf.initialize(lambda: iter([]), nlp=nlp)
         self.nlp = nlp
 
-    def get_word_embeddings(self, doc: Doc) -> List[Tuple[Token, np.ndarray]]:
+    def get_word_embeddings(self, doc: Doc, include_extra_pos: set = frozenset()) -> List[Tuple[Token, np.ndarray]]:
         if len(doc) == 0:
             return []
         embeddings = doc._.trf_data.tensors[0]
@@ -59,7 +59,7 @@ class EmbeddingExtractor:
 
         results = []
         for token, alignments in zip(doc, doc._.trf_data.align):
-            if token.pos in self.target_pos_set and alignments.data.shape[0] != 0:
+            if token.pos in (self.target_pos_set | include_extra_pos) and alignments.data.shape[0] != 0:
                 token_embedding = embeddings[alignments.data[0, 0]:alignments.data[-1, 0] + 1]
                 if using_gpu:
                     token_embedding = cupy.asnumpy(token_embedding)  # move the array off the GPU

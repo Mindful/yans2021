@@ -1,15 +1,23 @@
-# Examplify
+# 文脈化埋め込みを用いた言語学習者のための語義別例文検索システム
+
+NLP若手の回（YANS)で発表させていただいた研究です。
+
+[![Poster image](poster.jpg)](poster.pdf)
+
+## データのダウンロード
 ```shell
 wget https://dumps.wikimedia.org/other/cirrussearch/current/enwiki-20210802-cirrussearch-content.json.gz
 ```
 
+
+## 事前処理
 ```shell
-python ingest_sentences.py --input wiki --run fw
-python embed_words.py --run fw
-./postprocess_data.sh fw
+python ingest_sentences.py --input wiki --run yans
+python embed_words.py --run yans
+./postprocess_data.sh yans
 ```
 
+## ウェブUI
 ```shell
-python cluster_by_key.py --run fw --key play
-python search_embeddings.py --run fw --input "I like to [play] the violin."
+RUN=yans uvicorn web:app
 ```

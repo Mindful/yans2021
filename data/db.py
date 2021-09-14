@@ -172,7 +172,7 @@ class DbConnection:
 
         self.con.commit()
 
-    def get_cluster(self, lemma: str, pos: int, tree: str) -> Optional[WordCluster]:
+    def get_cluster(self, lemma: str, pos: int, tree: str, include_words: bool = True) -> Optional[WordCluster]:
         # this comes from user input so we can't use string formatting without risking SQL injection
         # consequently, we can't use read_clusters or read_words
         cluster_cursor = self.cur.execute('SELECT * from clusters where lemma = ? and pos =? and tree =?',
@@ -182,14 +182,15 @@ class DbConnection:
         except StopIteration:
             return None
 
-        word_cursor = self.cur.execute('''select words.id, words.form, words.lemma, words.pos, sentences.sent, 
-        words.embedding, words.display_embedding, junction.label
-        from junction 
-        join words on junction.word_id = words.id 
-        join sentences on words.sentence = sentences.id 
-        where cluster_id=?''', (cluster.id,))
+        if include_words:
+            word_cursor = self.cur.execute('''select words.id, words.form, words.lemma, words.pos, sentences.sent, 
+            words.embedding, words.display_embedding, junction.label
+            from junction 
+            join words on junction.word_id = words.id 
+            join sentences on words.sentence = sentences.id 
+            where cluster_id=?''', (cluster.id,))
 
-        cluster.words = [ClusterWord(*x) for x in word_cursor]
+            cluster.words = [ClusterWord(*x) for x in word_cursor]
 
         return cluster
 

@@ -1,12 +1,13 @@
 # https://pilehvar.github.io/xlwic/data/README.txt
 import argparse
 import csv
+import logging
 from collections import namedtuple
 from typing import Optional
 
 from data.db import WordCluster
-from helpers import extractor, get_or_create_cluster, classify_embedding, ClusterConstructionError
-from spacy.parts_of_speech import NOUN, VERB
+from helpers import extractor, classify_embedding, ClusterConstructionError, db
+from spacy.parts_of_speech import NOUN, VERB, PROPN
 from tqdm import tqdm
 
 pos_map = {
@@ -22,22 +23,27 @@ RowData = namedtuple('RowData', ['lemma', 'target_word', 'pos', 'start_1', 'end_
                                  'example_1', 'example_2', 'label'])
 
 
-def get_cluster(lemma: str, pos: int) -> Optional[WordCluster]:
-    try:
-        return get_or_create_cluster(lemma, pos, 'r')
-    except (ClusterConstructionError, ValueError):
-        return None
+def find_word_in_embeddings(embeddings, token_start, lemma):
+    if sum(1 for token, _ in embeddings if token.lemma_ == lemma) == 1:
+        return next(embedding for token, embedding in embeddings if token.lemma_ == lemma)
+    else:
+        return next(embedding for token, embedding in embeddings if token.idx == token_start)
 
 
 def compute_row_label(row: RowData, clusters: Optional[WordCluster]) -> int:
     if clusters is None:
+        logging.warning(f'No cluster for {row.lemma}/{row.pos}')
         return -1
 
-    embeddings_1 = extractor.get_word_embeddings(extractor.nlp(row.example_1))
-    embeddings_2 = extractor.get_word_embeddings(extractor.nlp(row.example_2))
+    embeddings_1 = extractor.get_word_embeddings(extractor.nlp(row.example_1), include_extra_pos={PROPN})
+    embeddings_2 = extractor.get_word_embeddings(extractor.nlp(row.example_2), include_extra_pos={PROPN})
 
-    target_embedding_1 = next(embedding for token, embedding in embeddings_1 if token.idx == row.start_1)
-    target_embedding_2 = next(embedding for token, embedding in embeddings_2 if token.idx == row.start_2)
+    try:
+        target_embedding_1 = find_word_in_embeddings(embeddings_1, int(row.start_1), row.lemma)
+        target_embedding_2 = find_word_in_embeddings(embeddings_2, int(row.start_2), row.lemma)
+    except StopIteration:
+        logging.warning(f'Unable to find token for {row.lemma}/{row.pos}')
+        return -1
 
     label_1 = classify_embedding(target_embedding_1, clusters)
     label_2 = classify_embedding(target_embedding_2, clusters)
@@ -52,6 +58,7 @@ def main():
 
     args = parser.parse_args()
     output_name = args.input.split('.')[0] + '_hyp.csv'
+    label_file_name = args.input.split('.')[0] + '_labels.csv'
 
     with open(args.input, 'r') as f:
         input_rows = list(csv.reader(f, delimiter='\t'))
@@ -64,20 +71,26 @@ def main():
 
     lemma_pos_set = {(row.lemma, row.pos) for row in rows}
     clusters_by_lemma = {
-        (lemma, pos): get_cluster(lemma, pos) for lemma, pos
+        (lemma, pos): db.get_cluster(lemma, pos, 'r', include_words=False) for lemma, pos
         in tqdm(sorted(lemma_pos_set, key=lambda x: x[0]), 'fetching or building clusters')
     }
 
-    labels = [compute_row_label(row, clusters_by_lemma[(row.lemma, row.pos)]) for row in rows]
+    labels = [compute_row_label(row, clusters_by_lemma[(row.lemma, row.pos)]) for row in tqdm(rows, 'labeling')]
     failed_rows = sum(1 for x in labels if x == -1)
     labels = [label if label != -1 else 0 for label in labels]
 
     with open(output_name, 'w') as outfile:
-        outfile.writelines(str(x) for x in labels)
+        outfile.writelines(str(x)+'\n' for x in labels)
 
     print('Had to default labels for', failed_rows, '/', len(labels), 'rows',
-          f'{round(failed_rows/len(labels)) * 100}%')
-    print('Wrote output to', outfile)
+          f'{round(failed_rows/len(labels), 2) * 100}%')
+    print('Wrote output to', output_name)
+
+    if rows[0].label is not None:
+        with open(label_file_name, 'w') as label_outfile:
+            label_outfile.writelines(str(x.label) + '\n' for x in rows)
+
+        print('Wrote labels to', label_file_name)
 
 
 if __name__ == '__main__':
