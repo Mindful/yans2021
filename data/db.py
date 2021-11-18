@@ -9,6 +9,20 @@ from tqdm import tqdm
 import numpy as np
 import io
 
+
+example_attributes = [
+    ('id', 'INTEGER PRIMARY KEY'),
+    ('input_form', 'TEXT NOT NULL'),
+    ('form', 'TEXT NOT NULL'),
+    ('lemma', 'TEXT NOT NULL'),
+    ('pos', 'INT NOT NULL'),
+    ('sentence', 'TEXT NOT NULL'),
+    ('embedding', 'ARRAY NOT NULL'),
+]
+Example = namedtuple('Word', [name for name, type_ in example_attributes])
+EXAMPLE_TABLE_SCHEMA = '( ' + ', '.join(f'{name} {type_}' for name, type_ in example_attributes) + ')'
+
+
 word_attributes = [
     ('id', 'INTEGER PRIMARY KEY'),
     ('form', 'TEXT NOT NULL'),
@@ -133,6 +147,7 @@ class DbConnection:
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS sentences{SENTENCE_TABLE_SCHEMA}')
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS clusters{CLUSTER_TABLE_SCHEMA}')
         self.cur.execute(f'CREATE TABLE IF NOT EXISTS junction{JUNCTION_TABLE_SCHEMA}')
+        self.cur.execute(f'CREATE TABLE IF NOT EXISTS examples{EXAMPLE_TABLE_SCHEMA}')
         self.cur.execute(f'CREATE INDEX IF NOT EXISTS junction_index on junction(cluster_id)')
         self.con.commit()
 
@@ -211,6 +226,11 @@ class DbConnection:
     def save_words(self, words: List[Word]) -> None:
         self.cur.executemany(f'INSERT INTO words ({",".join(name for name, type_ in word_attributes if name != "id")})'
                              f' values ({",".join("?" for _ in word_attributes)})', words)
+        self.con.commit()
+
+    def save_examples(self, examples: List[Example]) -> None:
+        self.cur.executemany(f'INSERT INTO examples ({",".join(name for name, type_ in example_attributes if name != "id")})'
+                             f' values ({",".join("?" for _ in example_attributes)})', words)
         self.con.commit()
 
     def add_display_embedding_to_words(self, display_embedding_data: List[Tuple[int, np.ndarray]]):
