@@ -20,8 +20,8 @@ def main():
 
     args = parser.parse_args()
 
-    db = DbConnection(args.run+'_sentences')
-    write_buffer = WriteBuffer('sentence', db.save_examples)
+    db = DbConnection(args.run)
+    write_buffer = WriteBuffer('example', db.save_examples)
     spacy.require_gpu()
     extractor = EmbeddingExtractor()
 
