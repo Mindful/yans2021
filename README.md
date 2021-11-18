@@ -21,3 +21,11 @@ python embed_words.py --run yans
 ```shell
 RUN=yans uvicorn web:app
 ```
+
+
+# For definition generation
+
+```shell
+CUDA_VISIBLE_DEVICES="2" python ingest_examples.py --input ../generationary_emnlp/data/corpora/orig/chang_seen_valid.contexts.txt
+```
+

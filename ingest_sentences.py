@@ -13,8 +13,14 @@ def main():
     parser.add_argument('--input', required=True)
     parser.add_argument('--run', required=False, default='default_run')
     parser.add_argument('--lines', required=False, type=int)
+    parser.add_argument('--example_db', required=False)
 
     args = parser.parse_args()
+
+    if args.example_db is not None:
+        example_db_con = DbConnection(args.example_db)
+        cur = example_db_con.con.execute("SELECT input_form FROM examples")
+        target_forms = {x[0] for x in cur}
 
     seen_sents = BloomFilter(max_elements=200000000, error_rate=0.001)
 
@@ -32,7 +38,13 @@ def main():
 
     for sentence in sentence_iter:
         if sentence not in seen_sents:
-            seen_sents.add(sentence)
+            if args.example_db:
+                tokens = set(sentence.split()) #TODO: iffy method of splitting, but probably how input forms are done too
+                if len(tokens & target_forms) > 0:
+                    seen_sents.add(sentence)
+            else:
+                seen_sents.add(sentence)
+
             write_buffer.add(sentence)
 
     write_buffer.flush()
