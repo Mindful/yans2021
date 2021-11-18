@@ -21,6 +21,9 @@ def main():
         example_db_con = DbConnection(args.example_db)
         cur = example_db_con.con.execute("SELECT input_form FROM examples")
         target_forms = {x[0] for x in cur}
+        logger.info(f"found {len(target_forms)} target forms")
+        saved = 0
+        skipped = 0
 
     seen_sents = BloomFilter(max_elements=200000000, error_rate=0.001)
 
@@ -42,12 +45,17 @@ def main():
                 tokens = set(sentence.split()) #TODO: iffy method of splitting, but probably how input forms are done too
                 if len(tokens & target_forms) > 0:
                     seen_sents.add(sentence)
+                    saved += 1
+                else:
+                    skipped += 1
             else:
                 seen_sents.add(sentence)
 
             write_buffer.add(sentence)
 
     write_buffer.flush()
+    if args.example_db:
+        print('Saved', saved, 'skipped', skipped)
 
 
 if __name__ == '__main__':
