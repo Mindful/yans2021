@@ -11,7 +11,6 @@ import io
 
 
 example_attributes = [
-    ('id', 'INTEGER PRIMARY KEY'),
     ('input_form', 'TEXT NOT NULL'),
     ('form', 'TEXT NOT NULL'),
     ('lemma', 'TEXT NOT NULL'),
@@ -19,7 +18,7 @@ example_attributes = [
     ('sentence', 'TEXT NOT NULL'),
     ('embedding', 'ARRAY NOT NULL'),
 ]
-Example = namedtuple('Word', [name for name, type_ in example_attributes])
+Example = namedtuple('Example', [name for name, type_ in example_attributes])
 EXAMPLE_TABLE_SCHEMA = '( ' + ', '.join(f'{name} {type_}' for name, type_ in example_attributes) + ')'
 
 

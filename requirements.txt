@@ -11,3 +11,8 @@ jsonlines
 bloom-filter2
 pydantic
 cachetools
+
+#generationary dependency
+nltk
+sacremoses
+fairseq
