@@ -45,7 +45,7 @@ def main():
         word_gen = (Example(input_form, token.text, token.lemma_.lower(), token.pos, sentence, embedding)
                     for token, embedding in extractor.get_word_embeddings(doc))
 
-        output_word = next((x for x in word_gen if x.text == input_form.lower()), None)
+        output_word = next((x for x in word_gen if x.form == input_form.lower()), None)
         if output_word is None:
             skipped['did_not_find_word'] += 1
             continue
@@ -54,8 +54,8 @@ def main():
 
     write_buffer.flush()
     logger.info("Finished writing")
-    skipped = sum(x for x in skipped.values())
-    logger.info(f"Found {total} total examples, skipped {skipped} of those")
+    total_skipped = sum(x for x in skipped.values())
+    logger.info(f"Found {total} total examples, skipped {total_skipped} of those")
     print(str({x: y/total for x, y in skipped.items()}))
 
 

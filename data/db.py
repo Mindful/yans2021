@@ -229,7 +229,7 @@ class DbConnection:
 
     def save_examples(self, examples: List[Example]) -> None:
         self.cur.executemany(f'INSERT INTO examples ({",".join(name for name, type_ in example_attributes if name != "id")})'
-                             f' values ({",".join("?" for _ in example_attributes)})', words)
+                             f' values ({",".join("?" for _ in example_attributes)})', examples)
         self.con.commit()
 
     def add_display_embedding_to_words(self, display_embedding_data: List[Tuple[int, np.ndarray]]):
