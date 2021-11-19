@@ -47,13 +47,16 @@ def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: se
             pass
 
         try:
-            word_gen = (Word(token.text, token.lemma_.lower(), token.pos, ident, embedding, None)
-                        for token, embedding in extractor.get_word_embeddings(doc))
+            relevant_tokens = sum(1 for token in doc if token.lemma_.lower() in word_set or token.lower_ in word_set)
+            if relevant_tokens > 0:
+                word_gen = (Word(token.text, token.lemma_.lower(), token.pos, ident, embedding, None)
+                            for token, embedding in extractor.get_word_embeddings(doc))
 
-            output_words = [word for word in word_gen if word.lemma not in banned_lemmas and
-                            (word.lemma in word_set or word.form.lower() in word_set)]
+                output_words = [word for word in word_gen if word.lemma not in banned_lemmas and
+                                (word.lemma in word_set or word.form.lower() in word_set)]
 
-            word_queue.put(output_words, block=True, timeout=None)
+                word_queue.put(output_words, block=True, timeout=None)
+
         except Exception as e:
             print(doc)
             raise e
@@ -68,11 +71,17 @@ def main():
     parser.add_argument('--run', required=False, default='default_run')
     parser.add_argument('--reduction', required=False, default='first')
     parser.add_argument('--gpus', required=False, type=int, default=8)
+    parser.add_argument('--example_db', required=False)
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
     args = parser.parse_args()
 
-    target_words = get_target_words()
+    if args.example_db is not None:
+        example_db = DbConnection(args.example_db)
+        example_cursor = example_db.con.execute('select distinct form from examples;')
+        target_words = {x[0] for x in example_cursor}
+    else:
+        target_words = get_target_words()
 
     db = DbConnection(args.run + '_sentences')
     logger.info('Counting sentences')

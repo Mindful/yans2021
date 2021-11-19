@@ -49,11 +49,17 @@ class EmbeddingExtractor:
         nlp.disable_pipe('ner')
         trf = nlp.add_pipe("transformer", config=config)
         trf.initialize(lambda: iter([]), nlp=nlp)
+        nlp.disable_pipe('transformer')  # run it only if we actually want word embeddings, because it's slow
         self.nlp = nlp
+        self.trf = trf
 
     def get_word_embeddings(self, doc: Doc, include_extra_pos: set = frozenset()) -> List[Tuple[Token, np.ndarray]]:
         if len(doc) == 0:
             return []
+
+        if doc._.trf_data is None:
+            self.trf(doc)
+
         embeddings = doc._.trf_data.tensors[0]
         embeddings = embeddings.reshape((embeddings.shape[0] * embeddings.shape[1], embeddings.shape[2]))
 
