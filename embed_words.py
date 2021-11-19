@@ -56,6 +56,8 @@ def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: se
                                 (word.lemma in word_set or word.form.lower() in word_set)]
 
                 word_queue.put(output_words, block=True, timeout=None)
+            else:
+                word_queue.put(None, block=True, timeout=None)
 
         except Exception as e:
             print(doc)
@@ -118,6 +120,7 @@ def main():
     writing_db = DbConnection(args.run + '_words')
     write_buffer = WriteBuffer('word', writing_db.save_words)
     lemma_counter = Counter()
+    skipped = 0
 
     while processed_words < MAX_TOTAL:
         if not queue_has_filled and q.qsize() > 10000:
@@ -125,14 +128,17 @@ def main():
             print('------Queue filled up------')
 
         word_list = q.get(timeout=600)
+        if word_list is not None:
+            for word in word_list:
+                lemma_counter[word.lemma] += 1
+                if lemma_counter[word.lemma] >= MAX_PER_LEMMA:
+                    instruction_q.put(word.lemma)
+                    logging.info(f'Reached max count for lemma {word.lemma}')
+                else:
+                    write_buffer.add(word)
+        else:
+            skipped += 1
 
-        for word in word_list:
-            lemma_counter[word.lemma] += 1
-            if lemma_counter[word.lemma] >= MAX_PER_LEMMA:
-                instruction_q.put(word.lemma)
-                logging.info(f'Reached max count for lemma {word.lemma}')
-            else:
-                write_buffer.add(word)
         pbar.update(1)
         processed_words += 1
 
@@ -144,6 +150,7 @@ def main():
     for proc in processes:
         proc.join()
 
+    logging.info(f'Skipped {skipped}')
     logging.info('Done')
 
 

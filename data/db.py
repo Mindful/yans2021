@@ -129,7 +129,7 @@ class WriteBuffer:
 
     def __del__(self):
         if len(self.buffer) > 0:
-            raise RuntimeError(f'f{self.name} write buffer destroyed with {len(self.buffer)} items remaining in memory')
+            raise RuntimeError(f'{self.name} write buffer destroyed with {len(self.buffer)} items remaining in memory')
 
 
 class DbConnection:
