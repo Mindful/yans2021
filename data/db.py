@@ -223,8 +223,10 @@ class DbConnection:
         self.con.commit()
 
     def save_words(self, words: List[Word]) -> None:
+        words_without_id = [x[1:] for x in words]
         self.cur.executemany(f'INSERT INTO words ({",".join(name for name, type_ in word_attributes if name != "id")})'
-                             f' values ({",".join(name for name, type_ in word_attributes if name != "id")})', words)
+                             f' values ({",".join("?" for name, type_ in word_attributes if name != "id")})',
+                             words_without_id)
         self.con.commit()
 
     def save_examples(self, examples: List[Example]) -> None:
