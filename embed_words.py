@@ -122,7 +122,7 @@ def main():
     lemma_counter = Counter()
     skipped = 0
 
-    while processed_words < MAX_TOTAL:
+    while processed_words < MAX_TOTAL and processed_words < total_sents:
         if not queue_has_filled and q.qsize() > 10000:
             queue_has_filled = True
             print('------Queue filled up------')
