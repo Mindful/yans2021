@@ -27,5 +27,6 @@ RUN=yans uvicorn web:app
 
 ```shell
 CUDA_VISIBLE_DEVICES="2" python ingest_examples.py --input ../generationary_emnlp/data/corpora/orig/chang_seen_valid.contexts.txt
+python ingest_sentences.py --input ../eng_corpus_data/enwiki_head.json --example_db default_run_examples
+python embed_words.py --example_db default_run_examples
 ```
-
