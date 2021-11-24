@@ -17,7 +17,8 @@ example_attributes = [
     ('pos', 'INT NOT NULL'),
     ('sentence', 'TEXT NOT NULL'),
     ('embedding', 'ARRAY NOT NULL'),
-    ('original_line', 'TEXT NOT NULL')
+    ('original_line', 'TEXT NOT NULL'),
+    ('target', 'TEXT NOT NULL')
 ]
 Example = namedtuple('Example', [name for name, type_ in example_attributes])
 EXAMPLE_TABLE_SCHEMA = '( ' + ', '.join(f'{name} {type_}' for name, type_ in example_attributes) + ')'
