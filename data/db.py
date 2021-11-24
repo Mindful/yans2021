@@ -220,6 +220,12 @@ class DbConnection:
         for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
             yield Word(*row)
 
+    def read_examples(self) -> Iterable[Example]:
+        sql = f'SELECT * from examples'
+        example_cursor = self.cur.execute(sql)
+        for row in tqdm(example_cursor, desc='reading examples'):
+            yield Example(*row)
+
     def save_sentences(self, sents: List[str]):
         self.cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
         self.con.commit()

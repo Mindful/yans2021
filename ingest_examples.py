@@ -19,24 +19,9 @@ def main():
 
     parser.add_argument('--contexts', nargs='+', type=Path, required=True)
     parser.add_argument('--targets', nargs='+', type=Path, required=True)
-    parser.add_argument('--output', type=str, required=True)
-    parser.add_argument('--excluded-lemmas', type=str, required=False, default='')
     parser.add_argument('--tag', default='define')
     parser.add_argument('--run', required=False, default='default_run')
     args = parser.parse_args()
-
-    excluded_lemmas = set()
-    if args.excluded_lemmas:
-        for line in Path(args.excluded_lemmas).read_text().splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            lemma, *other = line.split('\t')
-            lemma = lemma.strip().lower()
-            if not other:
-                excluded_lemmas.add((lemma, None))
-            else:
-                excluded_lemmas.add((lemma, other[0]))
 
     contexts_and_lines = (c for path in args.contexts for c in read_contexts_with_line(path, tag=args.tag))
     contexts = []

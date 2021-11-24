@@ -2,7 +2,10 @@ import sys
 from pathlib import Path
 import logging
 
-from data.db import DbConnection
+import numpy as np
+from tqdm import tqdm
+
+from data.db import DbConnection, Example
 from generationary.converters.utils import read_contexts, read_trgs, combine_contexts_and_trgs, Context
 from spacy.parts_of_speech import NOUN, ADJ, VERB, ADV
 from scipy.spatial.distance import cdist
@@ -18,47 +21,43 @@ POS_DICT = {
 }
 
 
-def target_line_with_clusters(db: DbConnection, cont: Context) -> str:
+def target_line_with_clusters(db: DbConnection, example: Example, cont: Context) -> str:
     lemma = cont.meta['lemma']
     pos = cont.meta.get('pos', None)
 
     if pos:
         where_clause = f'where pos={POS_DICT[pos]} and (form={lemma} or lemma={lemma})'
     else:
-        where_clause = f'form={lemma} or lemma={lemma}'
+        where_clause = f'where form={lemma} or lemma={lemma}'
 
-    words = db.read_words(use_tqdm=False, where_clause=where_clause)
-    #TODO: we need to get an embedding for the word, either by embedding here or reading from teh DB
-    # then use CDIST to compute relative distances
+    words = list(db.read_words(use_tqdm=False, where_clause=where_clause))
+
+    word_embeddings = np.ndarray([w.embedding for w in words])
+    target_embedding = np.expand_dims(example.embedding, axis=0)
+    distances = cdist(target_embedding, word_embeddings)[0]
+    sort_indices = np.argsort(distances)[:5]
+
+    closest_words = []
+    for idx in sort_indices:
+        closest_words.append(words[idx])
+
+    closest_sentence_ids = [w.sentence for w in closest_words]
+    #TODO: load sentences from the database
 
 
-
-
-
-
-
+    #TODO: use CDIST to compute relative distances
 
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
-    parser = ArgumentParser(
-        prog=__file__,
-        description="""
-        Helper script that merges usage examples and some target (e.g. definitions, synonyms sets, etc.).
-        This is necessary in order to run fairseq's own preprocessing scripts. 
-        """
-    )
-    parser.add_argument('--contexts', nargs='+', type=Path, required=True)
-    parser.add_argument('--targets', nargs='+', type=Path, required=True)
-    parser.add_argument('--output', type=str, required=True)
-    parser.add_argument('--excluded-lemmas', type=str, required=False, default='')
-    parser.add_argument('--tag', default='define')
-    parser.add_argument('--embedding_db')
-    args = parser.parse_args()
+    parser = ArgumentParser()
 
-    assert Path(args.embedding_db+'.db').exists()
-    embedding_db = DbConnection(args.embedding_db)
+    parser.add_argument('--example_db')
+    parser.add_argument('--embedding_db')
+    parser.add_argument('--excluded-lemmas', type=str, required=False, default='')
+
+    args = parser.parse_args()
 
     excluded_lemmas = set()
     if args.excluded_lemmas:
@@ -73,17 +72,12 @@ if __name__ == '__main__':
             else:
                 excluded_lemmas.add((lemma, other[0]))
 
-    contexts = (c for path in args.contexts for c in read_contexts(path, tag=args.tag))
-    data = None
-    for path in args.targets:
-        data = read_trgs(path, data)
-    contexts = combine_contexts_and_trgs(contexts, data, tag=args.tag)
+    assert Path(args.embedding_db+'.db').exists()
+    assert Path(args.example_db+'.db').exists()
+    embedding_db = DbConnection(args.embedding_db)
+    example_db = DbConnection(args.example_db)
 
-    contexts = list(contexts)
-
-    logging.info(f'Contexts: {len(contexts)}')
-    logging.info(f'Targets: {len(data)}')
-    logging.info(repr(list(data.items())[:5]))
+    examples = example_db.read_examples()
 
     output_en = Path(args.output + '.raw.en').resolve()
     output_gl = Path(args.output + '.raw.gloss').resolve()
@@ -91,7 +85,8 @@ if __name__ == '__main__':
     removed = 0
 
     with output_en.open('w') as f_en, output_gl.open('w') as f_gl:
-        for cont in contexts:
+        for example in tqdm(examples, 'processing examples'):
+            cont = Context.from_context_line(example.original_line)
             lemma = cont.meta.get('lemma').strip().lower()
             pos = cont.meta.get('pos')
             if (lemma, None) in excluded_lemmas or (lemma, pos) in excluded_lemmas:
