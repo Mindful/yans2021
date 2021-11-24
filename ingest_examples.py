@@ -3,7 +3,7 @@ import logging
 
 import spacy
 from datasets import tqdm
-from generationary.converters.utils import read_contexts
+from generationary.converters.utils import read_contexts_with_line
 from data.db import DbConnection, WriteBuffer, Example
 from nlp.embedding import EmbeddingExtractor
 import re
@@ -32,7 +32,7 @@ def main():
 
     total = 0
 
-    for context in tqdm(read_contexts(args.input)):
+    for context, line in tqdm(read_contexts_with_line(args.input)):
         total += 1
         input_form = context.meta['lemma']
         if '_' in input_form:
@@ -42,7 +42,7 @@ def main():
         sentence = special_token_re.sub('', context.line_src())
         doc = extractor.nlp(special_token_re.sub('', context.line_src()))
 
-        word_gen = (Example(input_form, token.text, token.lemma_.lower(), token.pos, sentence, embedding)
+        word_gen = (Example(input_form, token.text, token.lemma_.lower(), token.pos, sentence, embedding, line)
                     for token, embedding in extractor.get_word_embeddings(doc))
 
         output_word = next((x for x in word_gen if x.form == input_form.lower()), None)
