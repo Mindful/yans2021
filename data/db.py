@@ -31,7 +31,8 @@ word_attributes = [
     ('pos', 'INT NOT NULL'),
     ('sentence', 'INT NOT NULL'),
     ('embedding', 'ARRAY NOT NULL'),
-    ('display_embedding', 'ARRAY')
+    ('display_embedding', 'ARRAY'),
+    ('idx', 'INT NOT NULL')
 ]
 Word = namedtuple('Word', [name for name, type_ in word_attributes])
 WORD_TABLE_SCHEMA = '( ' + ', '.join(f'{name} {type_}' for name, type_ in word_attributes) + ')'
@@ -155,10 +156,9 @@ class DbConnection:
     def count_sentences(self) -> int:
         return self.cur.execute(f'SELECT COUNT(*) FROM sentences').fetchone()[0]
 
-    def read_sentences(self, use_tqdm: bool = False, bound: Optional[range] = None) -> Iterable[Tuple[int, str]]:
+    def read_sentences(self, use_tqdm: bool = False, bound: Optional[range] = None, where_clause: Optional[str] = '') -> Iterable[Tuple[int, str]]:
         if bound is None:
             sentences_total = self.count_sentences() if use_tqdm else None
-            where_clause = ''
         else:
             where_clause = f' where sentences.id >= {bound.start} and sentences.id < {bound.stop}'
             sentences_total = len(bound)

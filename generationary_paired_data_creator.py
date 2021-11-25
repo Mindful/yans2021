@@ -6,12 +6,12 @@ import numpy as np
 from tqdm import tqdm
 
 from data.db import DbConnection, Example
-from generationary.converters.utils import read_contexts, read_trgs, combine_contexts_and_trgs, Context
+from generationary.converters.utils import Context
 from spacy.parts_of_speech import NOUN, ADJ, VERB, ADV
 from scipy.spatial.distance import cdist
 
 
-sent_separator = '</s>'
+sent_separator = ' </s> '
 
 POS_DICT = {
     'NOUN': NOUN,
@@ -21,7 +21,7 @@ POS_DICT = {
 }
 
 
-def target_line_with_clusters(db: DbConnection, example: Example, cont: Context) -> str:
+def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, example: Example, cont: Context) -> str:
     lemma = cont.meta['lemma']
     pos = cont.meta.get('pos', None)
 
@@ -30,7 +30,7 @@ def target_line_with_clusters(db: DbConnection, example: Example, cont: Context)
     else:
         where_clause = f'where form={lemma} or lemma={lemma}'
 
-    words = list(db.read_words(use_tqdm=False, where_clause=where_clause))
+    words = list(word_db.read_words(use_tqdm=False, where_clause=where_clause))
 
     word_embeddings = np.ndarray([w.embedding for w in words])
     target_embedding = np.expand_dims(example.embedding, axis=0)
@@ -42,10 +42,28 @@ def target_line_with_clusters(db: DbConnection, example: Example, cont: Context)
         closest_words.append(words[idx])
 
     closest_sentence_ids = [w.sentence for w in closest_words]
-    #TODO: load sentences from the database
+    sentences = sentence_db.read_sentences(use_tqdm=False, where_clause=f' where id IN ({",".join(str(x) for x in closest_sentence_ids)})')
+    sentence_map = {
+        ident: text for ident, text in sentences
+    }
+    closest_words = [w._replace(sentence=sentence_map[w.sentence]) for w in closest_words]
 
+    addition_sentences = []
+    for word in closest_words:
+        left = word.sentence[:word.idx]
+        word_end = word.sentence.find(' ', word.idx)
+        if word_end == -1:
+            right = ''
+        else:
+            right = word.sentence[word_end+1:]
 
-    #TODO: use CDIST to compute relative distances
+        final_sentence = left.strip() + ' <define> ' + word.form + ' </define> ' + right.strip()
+        addition_sentences.append(final_sentence)
+
+    if len(closest_words) > 0:
+        return cont.line_trg() + sent_separator + sent_separator.join(addition_sentences)
+    else:
+        return cont.line_trg()
 
 
 if __name__ == '__main__':
@@ -53,8 +71,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
 
-    parser.add_argument('--example_db')
-    parser.add_argument('--embedding_db')
+    parser.add_argument('--run_name')
     parser.add_argument('--excluded-lemmas', type=str, required=False, default='')
 
     args = parser.parse_args()
@@ -72,10 +89,15 @@ if __name__ == '__main__':
             else:
                 excluded_lemmas.add((lemma, other[0]))
 
-    assert Path(args.embedding_db+'.db').exists()
-    assert Path(args.example_db+'.db').exists()
-    embedding_db = DbConnection(args.embedding_db)
-    example_db = DbConnection(args.example_db)
+    word_db = args.run_name + '_words'
+    example_db = args.run_name + '_examples'
+    sentence_db = args.run_name + '_sentences'
+    for db_name in (word_db, example_db, sentence_db):
+        assert Path(db_name+'.db').exists()
+
+    sentence_db = DbConnection(sentence_db)
+    word_db = DbConnection(word_db)
+    example_db = DbConnection(example_db)
 
     examples = example_db.read_examples()
 
@@ -93,11 +115,8 @@ if __name__ == '__main__':
                 removed += 1
                 continue
             if cont.tokens_trg:
-                line_src = cont.line_src()
-                line_trg = cont.line_trg()
-
-                line_src = " " + line_src.lstrip()
-                line_trg = " " + line_trg.lstrip()
+                line_src = " " + target_line_with_clusters(sentence_db, word_db, example, cont)
+                line_trg = " " + cont.line_trg().lstrip()
 
                 if len(line_src) >= 3 and len(line_trg) >= 3:
                     f_en.write(line_src + '\n')

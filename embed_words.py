@@ -49,7 +49,7 @@ def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: se
         try:
             relevant_tokens = sum(1 for token in doc if token.lemma_.lower() in word_set or token.lower_ in word_set)
             if relevant_tokens > 0:
-                word_gen = (Word(None, token.text, token.lemma_.lower(), token.pos, ident, embedding, None)
+                word_gen = (Word(None, token.text, token.lemma_.lower(), token.pos, ident, embedding, None, token.idx)
                             for token, embedding in extractor.get_word_embeddings(doc))
 
                 output_words = [word for word in word_gen if word.lemma not in banned_lemmas and
