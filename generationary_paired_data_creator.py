@@ -73,6 +73,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--run_name')
     parser.add_argument('--excluded-lemmas', type=str, required=False, default='')
+    parser.add_argument('--output')
 
     args = parser.parse_args()
 

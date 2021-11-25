@@ -35,7 +35,7 @@ def main():
         data = read_trgs(path, data)
     contexts = list(tqdm(combine_contexts_and_trgs(contexts, data, tag=args.tag), 'adding target data'))
 
-    db = DbConnection(args.run)
+    db = DbConnection(args.run+'_examples')
     write_buffer = WriteBuffer('example', db.save_examples)
     spacy.require_gpu()
     extractor = EmbeddingExtractor()
