@@ -56,16 +56,8 @@ def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: se
                 word_gen = (Word(None, token.text, token.lemma_.lower(), token.pos, ident, embedding, None, token.idx)
                             for token, embedding in extractor.get_word_embeddings(doc))
 
-                for x in doc:
-                    print(x, x.pos_)
-                words = list(word_gen)
-                print([(x.lemma, x.form) for x in words])
-                output_words = [word for word in words if word.lemma not in banned_lemmas and
+                output_words = [word for word in word_gen if word.lemma not in banned_lemmas and
                                 (word.lemma in word_set or word.form.lower() in word_set)]
-                print([(x.lemma, x.form) for x in output_words])
-
-                # output_words = [word for word in word_gen if word.lemma not in banned_lemmas and
-                #                 (word.lemma in word_set or word.form.lower() in word_set)]
 
                 word_queue.put(output_words, block=True, timeout=None)
             else:
