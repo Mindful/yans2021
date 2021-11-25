@@ -44,14 +44,15 @@ def main():
             if args.example_db:
                 tokens = set(sentence.split()) #TODO: iffy method of splitting, but probably how input forms are done too
                 if len(tokens & target_forms) > 0:
+                    write_buffer.add(sentence)
                     seen_sents.add(sentence)
                     saved += 1
                 else:
                     skipped += 1
             else:
+                write_buffer.add(sentence)
                 seen_sents.add(sentence)
 
-            write_buffer.add(sentence)
 
     write_buffer.flush()
     if args.example_db:

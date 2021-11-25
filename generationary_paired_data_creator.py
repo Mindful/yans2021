@@ -25,14 +25,19 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
     lemma = cont.meta['lemma']
     pos = cont.meta.get('pos', None)
 
+    target_pos = POS_DICT.get(pos, example.pos)
+
     if pos:
-        where_clause = f'where pos={POS_DICT[pos]} and (form={lemma} or lemma={lemma})'
+        where_clause = f'where pos={target_pos} and (form=\'{lemma}\' or lemma=\'{lemma}\')'
     else:
-        where_clause = f'where form={lemma} or lemma={lemma}'
+        where_clause = f'where form=\'{lemma}\' or lemma=\'{lemma}\''
 
     words = list(word_db.read_words(use_tqdm=False, where_clause=where_clause))
 
-    word_embeddings = np.ndarray([w.embedding for w in words])
+    if len(words) == 0:
+        return cont.line_src()
+
+    word_embeddings = np.array([w.embedding for w in words])
     target_embedding = np.expand_dims(example.embedding, axis=0)
     distances = cdist(target_embedding, word_embeddings)[0]
     sort_indices = np.argsort(distances)[:5]
@@ -60,10 +65,8 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
         final_sentence = left.strip() + ' <define> ' + word.form + ' </define> ' + right.strip()
         addition_sentences.append(final_sentence)
 
-    if len(closest_words) > 0:
-        return cont.line_trg() + sent_separator + sent_separator.join(addition_sentences)
-    else:
-        return cont.line_trg()
+    return cont.line_src() + sent_separator + sent_separator.join(addition_sentences)
+
 
 
 if __name__ == '__main__':
@@ -106,10 +109,13 @@ if __name__ == '__main__':
     output_gl = Path(args.output + '.raw.gloss').resolve()
 
     removed = 0
+    supplemented = 0
+    total = 0
 
     with output_en.open('w') as f_en, output_gl.open('w') as f_gl:
         for example in tqdm(examples, 'processing examples'):
-            cont = Context.from_context_line(example.original_line)
+            total += 1
+            cont = Context.from_context_line(example.original_line, tag='define')
             lemma = cont.meta.get('lemma').strip().lower()
             pos = cont.meta.get('pos')
             if (lemma, None) in excluded_lemmas or (lemma, pos) in excluded_lemmas:
@@ -117,6 +123,8 @@ if __name__ == '__main__':
                 continue
 
             line_src = " " + target_line_with_clusters(sentence_db, word_db, example, cont)
+            if sent_separator in line_src:
+                supplemented += 1
             line_trg = " " + example.target.lstrip()
 
             if len(line_src) >= 3 and len(line_trg) >= 3:
@@ -124,3 +132,5 @@ if __name__ == '__main__':
                 f_gl.write(line_trg + '\n')
 
     logging.info(f'Removed: {removed}')
+    logging.info(f'Supplemented: {supplemented}')
+    logging.info(f'Total: {total}')
