@@ -115,12 +115,12 @@ if __name__ == '__main__':
             if (lemma, None) in excluded_lemmas or (lemma, pos) in excluded_lemmas:
                 removed += 1
                 continue
-            if cont.tokens_trg:
-                line_src = " " + target_line_with_clusters(sentence_db, word_db, example, cont)
-                line_trg = " " + cont.line_trg().lstrip()
 
-                if len(line_src) >= 3 and len(line_trg) >= 3:
-                    f_en.write(line_src + '\n')
-                    f_gl.write(line_trg + '\n')
+            line_src = " " + target_line_with_clusters(sentence_db, word_db, example, cont)
+            line_trg = " " + example.target.lstrip()
+
+            if len(line_src) >= 3 and len(line_trg) >= 3:
+                f_en.write(line_src + '\n')
+                f_gl.write(line_trg + '\n')
 
     logging.info(f'Removed: {removed}')
