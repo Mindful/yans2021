@@ -48,9 +48,6 @@ def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: se
             pass
 
         try:
-            for x in (token for token in doc if token.lemma_.lower() in word_set or token.lower_ in word_set):
-                print(x, doc)
-                print('----------')
             relevant_tokens = sum(1 for token in doc if token.lemma_.lower() in word_set or token.lower_ in word_set)
             if relevant_tokens > 0:
                 word_gen = (Word(None, token.text, token.lemma_.lower(), token.pos, ident, embedding, None, token.idx)
