@@ -26,7 +26,15 @@ RUN=yans uvicorn web:app
 # For definition generation
 
 ```shell
-CUDA_VISIBLE_DEVICES="2" python ingest_examples.py --contexts ../generationary_emnlp/data/corpora/orig/chang_seen_valid.contexts.txt --targets ../generationary_emnlp/data/corpora/orig/chang.definitions.txt
+CUDA_VISIBLE_DEVICES="2" python ingest_examples.py --contexts ../chang_seen_valid_head.txt --targets ../generationary_emnlp/data/corpora/orig/chang.definitions.txt
+python ingest_sentences.py --input ../eng_corpus_data/enwiki_head.json --example_db default_run_examples
+python embed_words.py --run default_run --example_db default_run_examples
+python generationary_paired_data_creator.py --run_name default_run --output ../test
+```
+
+Full run
+```shell
+python ingest_examples.py --contexts ../generationary_emnlp/data/corpora/orig/chang_seen_train.contexts.txt --targets ../generationary_emnlp/data/corpora/orig/chang.definitions.txt --run t1
 python ingest_sentences.py --input ../eng_corpus_data/enwiki_head.json --example_db default_run_examples
 python embed_words.py --run default_run --example_db default_run_examples
 python generationary_paired_data_creator.py --run_name default_run --output ../test

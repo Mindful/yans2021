@@ -21,7 +21,8 @@ POS_DICT = {
 }
 
 
-def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, example: Example, cont: Context) -> str:
+def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, example: Example, cont: Context,
+                              max_added_sents: int, max_total_length: int) -> str:
     lemma = cont.meta['lemma']
     pos = cont.meta.get('pos', None)
 
@@ -34,8 +35,9 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
 
     words = list(word_db.read_words(use_tqdm=False, where_clause=where_clause))
 
+    base_line_src = cont.line_src()
     if len(words) == 0:
-        return cont.line_src()
+        return base_line_src
 
     word_embeddings = np.array([w.embedding for w in words])
     target_embedding = np.expand_dims(example.embedding, axis=0)
@@ -54,6 +56,7 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
     closest_words = [w._replace(sentence=sentence_map[w.sentence]) for w in closest_words]
 
     addition_sentences = []
+    current_length = len(base_line_src)
     for word in closest_words:
         left = word.sentence[:word.idx]
         word_end = word.sentence.find(' ', word.idx)
@@ -63,10 +66,14 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
             right = word.sentence[word_end+1:]
 
         final_sentence = left.strip() + ' <define> ' + word.form + ' </define> ' + right.strip()
-        addition_sentences.append(final_sentence)
+        if len(addition_sentences) < max_added_sents and current_length + len(final_sentence) < max_total_length:
+            addition_sentences.append(final_sentence)
+            current_length += len(final_sentence)
 
-    return cont.line_src() + sent_separator + sent_separator.join(addition_sentences)
-
+    if len(addition_sentences) > 0:
+        return base_line_src + sent_separator + sent_separator.join(addition_sentences)
+    else:
+        return base_line_src
 
 
 if __name__ == '__main__':
@@ -77,6 +84,8 @@ if __name__ == '__main__':
     parser.add_argument('--run_name')
     parser.add_argument('--excluded-lemmas', type=str, required=False, default='')
     parser.add_argument('--output')
+    parser.add_argument('--max_added_sents', type=int, default=3)
+    parser.add_argument('--max_total_length', type=int, default=500)
 
     args = parser.parse_args()
 
@@ -122,7 +131,8 @@ if __name__ == '__main__':
                 removed += 1
                 continue
 
-            line_src = " " + target_line_with_clusters(sentence_db, word_db, example, cont)
+            line_src = " " + target_line_with_clusters(sentence_db, word_db, example, cont,
+                                                       args.max_added_sents, args.max_total_length)
             if sent_separator in line_src:
                 supplemented += 1
             line_trg = " " + example.target.lstrip()
