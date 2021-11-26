@@ -130,15 +130,13 @@ def main():
             queue_has_filled = True
             print('------Queue filled up------')
 
-        maxed_words = set()
         word_list = q.get(timeout=600)
         if word_list is not None:
             for word in word_list:
                 lemma_counter[word.lemma] += 1
                 if lemma_counter[word.lemma] >= MAX_PER_LEMMA:
                     instruction_q.put(word.lemma)
-                    if word.lemma not in maxed_words:
-                        maxed_words.add(word.lemma)
+                    if lemma_counter[word.lemma] == MAX_PER_LEMMA:
                         logging.info(f'Reached max count for lemma {word.lemma}')
                 else:
                     write_buffer.add(word)
