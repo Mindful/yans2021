@@ -124,7 +124,7 @@ if __name__ == '__main__':
         start = (group - 1) * group_size
         stop = total_examples if group == group_count else group * group_size
         print('Target examples from', start, 'to', stop)
-        where_clause = f' where id > {start} and id < {stop}'
+        where_clause = f' where rowid > {start} and rowid < {stop}'
     else:
         where_clause = None
 

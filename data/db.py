@@ -144,54 +144,68 @@ class DbConnection:
 
         self.con.execute('PRAGMA synchronous = 0')
         self.con.execute('PRAGMA journal_mode = OFF')
-        self.cur = cur
-        self.cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
-        self.cur.execute(f'CREATE TABLE IF NOT EXISTS sentences{SENTENCE_TABLE_SCHEMA}')
-        self.cur.execute(f'CREATE TABLE IF NOT EXISTS clusters{CLUSTER_TABLE_SCHEMA}')
-        self.cur.execute(f'CREATE TABLE IF NOT EXISTS junction{JUNCTION_TABLE_SCHEMA}')
-        self.cur.execute(f'CREATE TABLE IF NOT EXISTS examples{EXAMPLE_TABLE_SCHEMA}')
-        self.cur.execute(f'CREATE INDEX IF NOT EXISTS junction_index on junction(cluster_id)')
+        cur.execute(f'CREATE TABLE IF NOT EXISTS words{WORD_TABLE_SCHEMA}')
+        cur.execute(f'CREATE TABLE IF NOT EXISTS sentences{SENTENCE_TABLE_SCHEMA}')
+        cur.execute(f'CREATE TABLE IF NOT EXISTS clusters{CLUSTER_TABLE_SCHEMA}')
+        cur.execute(f'CREATE TABLE IF NOT EXISTS junction{JUNCTION_TABLE_SCHEMA}')
+        cur.execute(f'CREATE TABLE IF NOT EXISTS examples{EXAMPLE_TABLE_SCHEMA}')
+        cur.execute(f'CREATE INDEX IF NOT EXISTS junction_index on junction(cluster_id)')
         self.con.commit()
+        cur.close()
 
     def count_sentences(self) -> int:
-        return self.cur.execute(f'SELECT COUNT(*) FROM sentences').fetchone()[0]
+        cur = self.con.cursor()
+        ret = cur.execute(f'SELECT COUNT(*) FROM sentences').fetchone()[0]
+        cur.close()
+        return ret
 
     def read_sentences(self, use_tqdm: bool = False, bound: Optional[range] = None, where_clause: Optional[str] = '') -> Iterable[Tuple[int, str]]:
+        cur = self.con.cursor()
         if bound is None:
             sentences_total = self.count_sentences() if use_tqdm else None
         else:
             where_clause = f' where sentences.id >= {bound.start} and sentences.id < {bound.stop}'
             sentences_total = len(bound)
 
-        for row in tqdm(self.cur.execute('SELECT * from sentences' + where_clause), disable=not use_tqdm,
+        for row in tqdm(cur.execute('SELECT * from sentences' + where_clause), disable=not use_tqdm,
                         total=sentences_total, desc='reading sentences'):
             yield row
+        cur.close()
 
     def count_words(self, where_clause: Optional[str] = None) -> int:
+        cur = self.con.cursor()
         where_clause = '' if where_clause is None else where_clause
-        return self.cur.execute(f'SELECT COUNT(*) FROM words ' + where_clause).fetchone()[0]
+        ret = cur.execute(f'SELECT COUNT(*) FROM words ' + where_clause).fetchone()[0]
+        cur.close()
+        return ret
 
     def count_clusters(self, where_clause: Optional[str] = None) -> int:
+        cur = self.con.cursor()
         where_clause = '' if where_clause is None else where_clause
-        return self.cur.execute(f'SELECT COUNT(*) FROM clusters ' + where_clause).fetchone()[0]
+        ret = cur.execute(f'SELECT COUNT(*) FROM clusters ' + where_clause).fetchone()[0]
+        cur.close()
+        return ret
 
     def save_cluster(self, cluster: WordCluster):
-        self.cur.execute(f'INSERT OR REPLACE INTO clusters '
+        cur = self.con.cursor()
+        cur.execute(f'INSERT OR REPLACE INTO clusters '
                          f'({",".join(name for name, _ in word_cluster_attributes if name != "id")})'
                          f' values ({",".join("?" for name, _ in word_cluster_attributes if name != "id")})',
                          tuple(val for key, val in cluster.__dict__.items() if key != "words" and key != "id"))
 
         junction_entries = [
-            (self.cur.lastrowid, word.id, word.cluster_label) for word in cluster.words
+            (cur.lastrowid, word.id, word.cluster_label) for word in cluster.words
         ]
-        self.cur.executemany('INSERT INTO junction VALUES (?, ?, ?)', junction_entries)
+        cur.executemany('INSERT INTO junction VALUES (?, ?, ?)', junction_entries)
 
         self.con.commit()
+        cur.close()
 
     def get_cluster(self, lemma: str, pos: int, tree: str, include_words: bool = True) -> Optional[WordCluster]:
+        cur = self.con.cursor()
         # this comes from user input so we can't use string formatting without risking SQL injection
         # consequently, we can't use read_clusters or read_words
-        cluster_cursor = self.cur.execute('SELECT * from clusters where lemma = ? and pos =? and tree =?',
+        cluster_cursor = cur.execute('SELECT * from clusters where lemma = ? and pos =? and tree =?',
                                           (lemma, pos, tree))
         try:
             cluster = WordCluster(*next(cluster_cursor), words=None)
@@ -199,7 +213,7 @@ class DbConnection:
             return None
 
         if include_words:
-            word_cursor = self.cur.execute('''select words.id, words.form, words.lemma, words.pos, sentences.sent, 
+            word_cursor = cur.execute('''select words.id, words.form, words.lemma, words.pos, sentences.sent, 
             words.embedding, words.display_embedding, junction.label
             from junction 
             join words on junction.word_id = words.id 
@@ -211,45 +225,58 @@ class DbConnection:
         return cluster
 
     def read_words(self, use_tqdm: bool = False, where_clause: Optional[str] = None) -> Iterable[Word]:
-
+        cur = self.con.cursor()
         word_total = self.count_words(where_clause) if use_tqdm else None
         where_clause = '' if where_clause is None else where_clause
 
         sql = f'SELECT * from words ' + where_clause
-        word_cursor = self.cur.execute(sql)
+        word_cursor = cur.execute(sql)
         for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
             yield Word(*row)
 
+        cur.close()
+
     def count_examples(self, where_clause: Optional[str] = None) -> int:
+        cur = self.con.cursor()
+
         where_clause = '' if where_clause is None else where_clause
-        return self.cur.execute(f'SELECT COUNT(*) FROM examples ' + where_clause).fetchone()[0]
+        ret = cur.execute(f'SELECT COUNT(*) FROM examples ' + where_clause).fetchone()[0]
+        cur.close()
+        return ret
 
     def read_examples(self, use_tqdm: bool = False, where_clause: Optional[str] = None) -> Iterable[Example]:
+        cur = self.con.cursor()
         examples_total = self.count_examples(where_clause) if use_tqdm else None
         where_clause = '' if where_clause is None else where_clause
 
         sql = f'SELECT * from examples '+where_clause
-        example_cursor = self.cur.execute(sql)
+        example_cursor = cur.execute(sql)
         for row in tqdm(example_cursor, desc='reading examples', disable=not use_tqdm, total=examples_total):
             yield Example(*row)
 
+        cur.close()
+
     def save_sentences(self, sents: List[str]):
-        self.cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
+        cur = self.con.cursor()
+        cur.executemany(f'INSERT OR IGNORE INTO sentences (sent) VALUES (?)', ((x,) for x in sents))
         self.con.commit()
 
     def save_words(self, words: List[Word]) -> None:
+        cur = self.con.cursor()
         words_without_id = [x[1:] for x in words]
-        self.cur.executemany(f'INSERT INTO words ({",".join(name for name, type_ in word_attributes if name != "id")})'
+        cur.executemany(f'INSERT INTO words ({",".join(name for name, type_ in word_attributes if name != "id")})'
                              f' values ({",".join("?" for name, type_ in word_attributes if name != "id")})',
                              words_without_id)
         self.con.commit()
 
     def save_examples(self, examples: List[Example]) -> None:
-        self.cur.executemany(f'INSERT INTO examples ({",".join(name for name, type_ in example_attributes if name != "id")})'
+        cur = self.con.cursor()
+        cur.executemany(f'INSERT INTO examples ({",".join(name for name, type_ in example_attributes if name != "id")})'
                              f' values ({",".join("?" for _ in example_attributes)})', examples)
         self.con.commit()
 
     def add_display_embedding_to_words(self, display_embedding_data: List[Tuple[int, np.ndarray]]):
+        cur = self.con.cursor()
         sql_data = [(embed, word_id) for word_id, embed in display_embedding_data]
-        self.cur.executemany('UPDATE words SET display_embedding = ? WHERE id = ?', sql_data)
+        cur.executemany('UPDATE words SET display_embedding = ? WHERE id = ?', sql_data)
         self.con.commit()
