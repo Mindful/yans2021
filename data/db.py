@@ -220,10 +220,17 @@ class DbConnection:
         for row in tqdm(word_cursor, disable=not use_tqdm, total=word_total, desc='reading words'):
             yield Word(*row)
 
-    def read_examples(self) -> Iterable[Example]:
-        sql = f'SELECT * from examples'
+    def count_examples(self, where_clause: Optional[str] = None) -> int:
+        where_clause = '' if where_clause is None else where_clause
+        return self.cur.execute(f'SELECT COUNT(*) FROM examples ' + where_clause).fetchone()[0]
+
+    def read_examples(self, use_tqdm: bool = False, where_clause: Optional[str] = None) -> Iterable[Example]:
+        examples_total = self.count_examples(where_clause) if use_tqdm else None
+        where_clause = '' if where_clause is None else where_clause
+
+        sql = f'SELECT * from examples '+where_clause
         example_cursor = self.cur.execute(sql)
-        for row in tqdm(example_cursor, desc='reading examples'):
+        for row in tqdm(example_cursor, desc='reading examples', disable=not use_tqdm, total=examples_total):
             yield Example(*row)
 
     def save_sentences(self, sents: List[str]):

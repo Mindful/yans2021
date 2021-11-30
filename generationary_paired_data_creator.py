@@ -86,8 +86,10 @@ if __name__ == '__main__':
     parser.add_argument('--output')
     parser.add_argument('--max_added_sents', type=int, default=3)
     parser.add_argument('--max_total_length', type=int, default=500)
+    parser.add_argument('--fraction', type=str)
 
     args = parser.parse_args()
+
 
     excluded_lemmas = set()
     if args.excluded_lemmas:
@@ -112,7 +114,21 @@ if __name__ == '__main__':
     word_db = DbConnection(word_db)
     example_db = DbConnection(example_db)
 
-    examples = example_db.read_examples()
+    if args.fraction:
+        numerator, denominator = args.fraction.split('/')
+        group = int(numerator)
+        group_count = int(denominator)
+        total_examples = example_db.count_examples()
+        group_size = total_examples // group_count
+
+        start = (group - 1) * group_size
+        stop = total_examples if group == group_count else group * group_size
+        print('Target examples from', start, 'to', stop)
+        where_clause = f' where id > {start} and id < {stop}'
+    else:
+        where_clause = None
+
+    examples = example_db.read_examples(use_tqdm=True, where_clause=where_clause)
 
     output_en = Path(args.output + '.raw.en').resolve()
     output_gl = Path(args.output + '.raw.gloss').resolve()
@@ -122,7 +138,7 @@ if __name__ == '__main__':
     total = 0
 
     with output_en.open('w') as f_en, output_gl.open('w') as f_gl:
-        for example in tqdm(examples, 'processing examples'):
+        for example in examples:
             total += 1
             cont = Context.from_context_line(example.original_line, tag='define')
             lemma = cont.meta.get('lemma').strip().lower()
