@@ -39,3 +39,5 @@ python ingest_sentences.py --input ../eng_corpus_data/enwiki-20210726-cirrussear
 python embed_words.py --run t1 --example_db t1_examples
 python generationary_paired_data_creator.py --run_name t1 --output t1
 ```
+
+Scipy memory leak: https://github.com/scipy/scipy/issues/14382

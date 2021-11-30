@@ -23,6 +23,7 @@ POS_DICT = {
 
 def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, example: Example, cont: Context,
                               max_added_sents: int, max_total_length: int) -> str:
+
     lemma = cont.meta['lemma']
     pos = cont.meta.get('pos', None)
 
@@ -34,6 +35,7 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
         where_clause = f'where form=\'{lemma}\' or lemma=\'{lemma}\''
 
     words = list(word_db.read_words(use_tqdm=False, where_clause=where_clause))
+
 
     base_line_src = cont.line_src()
     if len(words) == 0:
@@ -49,6 +51,7 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
         closest_words.append(words[idx])
 
     closest_sentence_ids = [w.sentence for w in closest_words]
+
     sentences = sentence_db.read_sentences(use_tqdm=False, where_clause=f' where id IN ({",".join(str(x) for x in closest_sentence_ids)})')
     sentence_map = {
         ident: text for ident, text in sentences
