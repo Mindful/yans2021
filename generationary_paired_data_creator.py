@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from tqdm import tqdm
 
-from data.db import DbConnection, Example
+from data.db import DbConnection, Example, example_splits
 from generationary.converters.utils import Context
 from spacy.parts_of_speech import NOUN, ADJ, VERB, ADV
 from scipy.spatial.distance import cdist
@@ -24,6 +24,10 @@ POS_DICT = {
 def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, example: Example, cont: Context,
                               max_added_sents: int, max_total_length: int) -> str:
 
+    base_line_src = cont.line_src()
+    if example.form is None:
+        return base_line_src  # this means it was a partial skip, we can't do anything to supplement it
+
     lemma = cont.meta['lemma']
     pos = cont.meta.get('pos', None)
 
@@ -37,7 +41,6 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
     words = list(word_db.read_words(use_tqdm=False, where_clause=where_clause))
 
 
-    base_line_src = cont.line_src()
     if len(words) == 0:
         return base_line_src
 
@@ -90,9 +93,9 @@ if __name__ == '__main__':
     parser.add_argument('--max_added_sents', type=int, default=3)
     parser.add_argument('--max_total_length', type=int, default=500)
     parser.add_argument('--fraction', type=str)
+    parser.add_argument('--split', required=True, type=str, choices=list(example_splits.keys()))
 
     args = parser.parse_args()
-
 
     excluded_lemmas = set()
     if args.excluded_lemmas:
@@ -116,20 +119,24 @@ if __name__ == '__main__':
     sentence_db = DbConnection(sentence_db)
     word_db = DbConnection(word_db)
     example_db = DbConnection(example_db)
+    example_split = example_splits[args.split]
 
     if args.fraction:
         numerator, denominator = args.fraction.split('/')
         group = int(numerator)
         group_count = int(denominator)
-        total_examples = example_db.count_examples()
+        upper_bound = example_db.con.execute('select max(rowid) from examples where split=?', example_split).fetchone()[0]
+        lower_bound = example_db.con.execute('select min(rowid) from examples where split=?', example_split).fetchone()[0]
+        total_examples = upper_bound - lower_bound
+
         group_size = total_examples // group_count
 
-        start = (group - 1) * group_size
-        stop = total_examples if group == group_count else group * group_size
+        start = lower_bound + ((group - 1) * group_size) - 1
+        stop = (upper_bound if group == group_count else group * group_size) + 1
         print('Target examples from', start, 'to', stop)
         where_clause = f' where rowid > {start} and rowid < {stop}'
     else:
-        where_clause = None
+        where_clause = f' where split={example_split}'
 
     examples = example_db.read_examples(use_tqdm=True, where_clause=where_clause)
 
@@ -154,9 +161,13 @@ if __name__ == '__main__':
                                                        args.max_added_sents, args.max_total_length)
             if sent_separator in line_src:
                 supplemented += 1
-            line_trg = " " + example.target.lstrip()
 
-            if len(line_src) >= 3 and len(line_trg) >= 3:
+            if args.split != 'test':
+                line_trg = " " + example.target.lstrip()
+            else:
+                line_trg = ''
+
+            if len(line_src) >= 3 and (len(line_trg) >= 3 or args.split == 'test'):
                 f_en.write(line_src + '\n')
                 f_gl.write(line_trg + '\n')
 
