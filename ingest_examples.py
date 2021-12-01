@@ -52,7 +52,7 @@ def main():
     total = 0
     split_id = example_splits[args.split]
 
-    for context, line in tqdm(zip(contexts, lines), 'processing contexts'):
+    for context, line in tqdm(zip(contexts, lines), 'processing contexts', total=len(contexts)):
         total += 1
         input_form = context.meta['lemma']
         target_line = context.line_trg() if args.split != 'test' else None
