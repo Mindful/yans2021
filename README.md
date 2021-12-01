@@ -34,9 +34,15 @@ python generationary_paired_data_creator.py --run_name default_run --output ../t
 
 Full run
 ```shell
+python ingest_examples.py --contexts ../generationary_emnlp/data/corpora/orig/chang_seen_train.contexts.txt --targets ../generationary_emnlp/data/corpora/orig/chang.definitions.txt --run cs --split train
 python ingest_examples.py --contexts ../generationary_emnlp/data/corpora/orig/chang_seen_valid.contexts.txt --targets ../generationary_emnlp/data/corpora/orig/chang.definitions.txt --run cs --split eval
-
-
+python ingest_examples.py --contexts ../generationary_emnlp/data/corpora/orig/chang_seen_test.contexts.txt  --targets ../generationary_emnlp/data/corpora/orig/chang.definitions.txt --run cs --split test
+python index_examples.py --run cs
+python ingest_sentences.py --input ../eng_corpus_data/enwiki-20210726-cirrussearch-content.json --example_db cs_examples --run cs #stopped after 300k articles
+python embed_words.py --run cs --example_db cs_examples
+python index_words.py --run cs
+python generationary_paired_data_creator.py --run_name cs --output cs_eval --split eval
+python generationary_paired_data_creator.py --run_name cs --output cs_test--split test
 ```
 
 

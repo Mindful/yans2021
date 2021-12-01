@@ -127,14 +127,15 @@ if __name__ == '__main__':
         group_count = int(denominator)
         upper_bound = example_db.con.execute('select max(rowid) from examples where split=?', example_split).fetchone()[0]
         lower_bound = example_db.con.execute('select min(rowid) from examples where split=?', example_split).fetchone()[0]
-        total_examples = upper_bound - lower_bound
+        total_examples = upper_bound - lower_bound + 1
 
         group_size = total_examples // group_count
 
-        start = lower_bound + ((group - 1) * group_size) - 1
-        stop = (upper_bound if group == group_count else group * group_size) + 1
-        print('Target examples from', start, 'to', stop)
-        where_clause = f' where rowid > {start} and rowid < {stop}'
+        start = lower_bound + ((group - 1) * group_size)
+        stop = (upper_bound + 1 if group == group_count else start + group_size)
+        print('Target examples from', start, 'to', stop-1)
+        where_clause = f' where rowid >= {start} and rowid < {stop}'
+        print(where_clause)
     else:
         where_clause = f' where split={example_split}'
 
