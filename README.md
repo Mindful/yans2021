@@ -41,17 +41,22 @@ python index_examples.py --run cs
 python ingest_sentences.py --input ../eng_corpus_data/enwiki-20210726-cirrussearch-content.json --example_db cs_examples --run cs #stopped after 300k articles
 python embed_words.py --run cs --example_db cs_examples
 python index_words.py --run cs
+python generationary_paired_data_creator.py --run_name cs --output cs_train --split train
 python generationary_paired_data_creator.py --run_name cs --output cs_eval --split eval
 python generationary_paired_data_creator.py --run_name cs --output cs_test--split test
 ```
 
-
-Full run
+Speed up data generation:
 ```shell
-python ingest_examples.py --contexts ../generationary_emnlp/data/corpora/orig/chang_seen_train.contexts.txt --targets ../generationary_emnlp/data/corpora/orig/chang.definitions.txt --run t1
-python ingest_sentences.py --input ../eng_corpus_data/enwiki-20210726-cirrussearch-content.json --example_db t1_examples --run t1 #stopped after 300k articles
-python embed_words.py --run t1 --example_db t1_examples
-python generationary_paired_data_creator.py --run_name t1 --output t1
+python generationary_paired_data_creator.py --run_name cs --output cs_18 --fraction 1/8 --split eval &
+python generationary_paired_data_creator.py --run_name cs --output cs_28 --fraction 2/8 --split eval &
+python generationary_paired_data_creator.py --run_name cs --output cs_38 --fraction 3/8 --split eval &
+python generationary_paired_data_creator.py --run_name cs --output cs_48 --fraction 4/8 --split eval &
+python generationary_paired_data_creator.py --run_name cs --output cs_58 --fraction 5/8 --split eval &
+python generationary_paired_data_creator.py --run_name cs --output cs_68 --fraction 6/8 --split eval &
+python generationary_paired_data_creator.py --run_name cs --output cs_78 --fraction 7/8 --split eval &
+python generationary_paired_data_creator.py --run_name cs --output cs_88 --fraction 8/8 --split eval &
 ```
+
 
 Scipy memory leak: https://github.com/scipy/scipy/issues/14382

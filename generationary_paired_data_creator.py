@@ -125,8 +125,8 @@ if __name__ == '__main__':
         numerator, denominator = args.fraction.split('/')
         group = int(numerator)
         group_count = int(denominator)
-        upper_bound = example_db.con.execute('select max(rowid) from examples where split=?', example_split).fetchone()[0]
-        lower_bound = example_db.con.execute('select min(rowid) from examples where split=?', example_split).fetchone()[0]
+        upper_bound = example_db.con.execute(f'select max(rowid) from examples where split={example_split}').fetchone()[0]
+        lower_bound = example_db.con.execute(f'select min(rowid) from examples where split={example_split}').fetchone()[0]
         total_examples = upper_bound - lower_bound + 1
 
         group_size = total_examples // group_count
