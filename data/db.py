@@ -9,16 +9,22 @@ from tqdm import tqdm
 import numpy as np
 import io
 
+example_splits = {
+    'train': 0,
+    'eval': 1,
+    'test': 2
+}
 
 example_attributes = [
     ('input_form', 'TEXT NOT NULL'),
-    ('form', 'TEXT NOT NULL'),
-    ('lemma', 'TEXT NOT NULL'),
-    ('pos', 'INT NOT NULL'),
+    ('form', 'TEXT'),
+    ('lemma', 'TEXT'),
+    ('pos', 'INT'),
     ('sentence', 'TEXT NOT NULL'),
-    ('embedding', 'ARRAY NOT NULL'),
+    ('embedding', 'ARRAY'),
     ('original_line', 'TEXT NOT NULL'),
-    ('target', 'TEXT NOT NULL')
+    ('target', 'TEXT'),
+    ('split', 'INT NOT NULL')
 ]
 Example = namedtuple('Example', [name for name, type_ in example_attributes])
 EXAMPLE_TABLE_SCHEMA = '( ' + ', '.join(f'{name} {type_}' for name, type_ in example_attributes) + ')'

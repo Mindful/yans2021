@@ -92,7 +92,6 @@ def main():
     logger.info('Counting sentences')
     total_sents = db.count_sentences()
     logger.info(f'Found {total_sents} sentences')
-    db.cur.close()
     db.con.close()
 
     devices = args.gpus
