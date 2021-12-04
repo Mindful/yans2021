@@ -163,12 +163,9 @@ if __name__ == '__main__':
             if sent_separator in line_src:
                 supplemented += 1
 
-            if args.split != 'test':
-                line_trg = " " + example.target.lstrip()
-            else:
-                line_trg = ''
+            line_trg = " " + example.target.lstrip()
 
-            if len(line_src) >= 3 and (len(line_trg) >= 3 or args.split == 'test'):
+            if len(line_src) >= 3 and len(line_trg) >= 3:
                 f_en.write(line_src + '\n')
                 f_gl.write(line_trg + '\n')
 
