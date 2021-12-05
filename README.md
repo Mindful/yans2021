@@ -60,6 +60,16 @@ cat cs_train*.raw.gloss > cs_train.raw.gloss
 
 conda activate generationary
 ./bart-run-kanagawa.sh CHA_S_SUPP
+
+
+python generate_glosses_from_src_trg.py \
+    --src ../data/corpora/preprocessed/cs_test.raw.en \
+    --trg ../data/corpora/preprocessed/cs_test.raw.gloss \
+    --checkpoint ../data/experiments/CHA_S_SUPP/checkpoint_best.pt \
+    --beam 10 --min-len 6 --len-penalty 3.0 \
+    --rerank \
+    --generated-out ../data/CHANG_S_SUPP.pred.txt \
+    --gold-out ../data/CHANG_S_SUPP.gold.txt \
 ```
 
 Speed up data generation:

@@ -31,13 +31,10 @@ def main():
         contexts.append(context)
         lines.append(line)
 
-    if args.split != 'test':
-        data = None
-        for path in args.targets:
-            data = read_trgs(path, data)
-        contexts = list(tqdm(combine_contexts_and_trgs(contexts, data, tag=args.tag), 'adding target data'))
-    else:
-        print('skip adding target data for test')
+    data = None
+    for path in args.targets:
+        data = read_trgs(path, data)
+    contexts = list(tqdm(combine_contexts_and_trgs(contexts, data, tag=args.tag), 'adding target data'))
 
     db = DbConnection(args.run+'_examples')
     write_buffer = WriteBuffer('example', db.save_examples)
@@ -55,7 +52,7 @@ def main():
     for context, line in tqdm(zip(contexts, lines), 'processing contexts', total=len(contexts)):
         total += 1
         input_form = context.meta['lemma']
-        target_line = context.line_trg() if args.split != 'test' else None
+        target_line = context.line_trg()
 
         sentence = special_token_re.sub('', context.line_src())
         if '_' in input_form:
