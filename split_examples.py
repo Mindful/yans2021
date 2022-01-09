@@ -1,9 +1,12 @@
 import argparse
 import logging
 import re
-from generationary.converters.utils import read_contexts, Context
+from pathlib import Path
+
+from generationary.converters.utils import Context, read_contexts_with_line
 from tqdm import tqdm
 import csv
+import numpy as np
 
 
 special_token_re = re.compile(r'<.*?>\s')
@@ -28,6 +31,7 @@ split_metrics = {
 }
 
 
+
 def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
@@ -36,25 +40,48 @@ def main():
     parser.add_argument('--input', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--metric', choices=list(split_metrics.keys()), required=True)
+    parser.add_argument('--split_count', required=False, default=4)
 
     args = parser.parse_args()
+    if 100 % args.split_count != 0:
+        raise Exception("100 must be divisible by split_count")
 
     compute_metric = split_metrics[args.metric]
 
     contexts = []
-    for context in tqdm(read_contexts(args.input), 'reading contexts'):
+    for context, line in tqdm(read_contexts_with_line(args.input), 'reading contexts'):
         context.metric = compute_metric(context)
+        context.line = line
         contexts.append(context)
 
-    count = 0
-    for x in contexts:
-        if x.metric > 0:
-            count += 1
-            if count > 20:
-                break
-            else:
-                sentence = special_token_re.sub('', x.line_src())
-                print(x.meta['lemma'], sentence, x.metric)
+    contexts.sort(key=lambda x: x.metric)
+    print(f'Found {len(contexts)} contexts')
+    metric_values = [x.metric for x in contexts]
+    split_percentage = 100 // args.split_count
+    splits = []
+
+    floor = 0
+    for i in range(1, args.split_count+1):
+        ceiling = np.percentile(metric_values, i * split_percentage)
+        if i == args.split_count:
+            ceiling += 1  # raise the ceiling so that we get the last element in the array
+        splits.append([c for c in contexts if floor <= c.metric < ceiling])
+        floor = ceiling
+
+    for idx, split in enumerate(splits):
+        print(f'Split {idx} of size {len(split)}')
+
+    assert sum(len(x) for x in splits) == len(contexts)
+
+    output = Path(args.output)
+    output.mkdir(exist_ok=True)
+    for i in range(1, args.split_count+1):
+        fname = f'split_{i}.txt'
+        outfile = output / Path(fname)
+        with outfile.open('w') as f:
+            f.writelines(x.line + '\n' for x in splits[i-1])
+
+        print(f'Wrote {fname}')
 
 main()
 

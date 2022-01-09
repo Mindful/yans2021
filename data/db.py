@@ -12,7 +12,15 @@ import io
 example_splits = {
     'train': 0,
     'eval': 1,
-    'test': 2
+    'test': 2,
+    # for split data
+    'test1': 3,
+    'test2': 4,
+    'test3': 5,
+    'test4': 6,
+    'test5': 7,
+    'test6': 8,
+    'test7': 9
 }
 
 example_attributes = [
