@@ -20,7 +20,8 @@ example_splits = {
     'test4': 6,
     'test5': 7,
     'test6': 8,
-    'test7': 9
+    'test7': 9,
+    'test8': 10
 }
 
 example_attributes = [

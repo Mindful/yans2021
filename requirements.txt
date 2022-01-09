@@ -1,5 +1,5 @@
 tqdm
-spacy[cuda,transformers]
+spacy[cuda,transformers]==3.1.0
 numpy
 sklearn
 torch
