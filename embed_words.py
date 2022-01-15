@@ -6,12 +6,10 @@ import queue
 from collections import Counter
 from typing import Optional
 
-import spacy
 from multiprocessing import Process, Queue
 
 from tqdm import tqdm
 
-from nlp.embedding import EmbeddingExtractor, reduction_function
 from data.db import DbConnection, Word, WriteBuffer
 
 MAX_PER_LEMMA = 1000
@@ -28,6 +26,9 @@ def get_target_words():
 
 def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: set, process_num: int,
                        sentence_bound: range, reduction: str, run: str, target_pos_set: Optional[set]):
+    from nlp.embedding import EmbeddingExtractor, reduction_function
+    import spacy
+
     logging.info(f'Acquiring GPU {process_num}')
     spacy.require_gpu(process_num)
     extractor = EmbeddingExtractor(embedding_reducer=reduction_function[reduction], target_pos_set=target_pos_set)
