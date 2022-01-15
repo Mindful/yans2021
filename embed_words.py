@@ -26,7 +26,7 @@ def get_target_words():
     return set(x[0] for x in rows)
 
 
-def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: set[str], process_num: int,
+def embedding_executor(word_queue: Queue, instruction_queue: Queue, word_set: set, process_num: int,
                        sentence_bound: range, reduction: str, run: str, target_pos_set: Optional[set]):
     logging.info(f'Acquiring GPU {process_num}')
     spacy.require_gpu(process_num)
