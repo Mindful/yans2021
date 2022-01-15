@@ -20,7 +20,7 @@ MAX_TOTAL = 10000000
 ABORT_INSTRUCTION = -1
 
 
-def get_target_words() -> set[str]:
+def get_target_words():
     with open('count_1w.txt', 'r') as f:
         rows = list(csv.reader(f, delimiter='\t'))
     return set(x[0] for x in rows)
