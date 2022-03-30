@@ -11,6 +11,7 @@ jsonlines
 bloom-filter2
 pydantic
 cachetools
+nltk
 
 #generationary dependency
 nltk

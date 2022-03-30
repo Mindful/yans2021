@@ -10,8 +10,7 @@ from generationary.converters.utils import Context
 from spacy.parts_of_speech import NOUN, ADJ, VERB, ADV
 from scipy.spatial.distance import cdist
 
-
-sent_separator = ' </s> '
+from constants import sent_separator
 
 POS_DICT = {
     'NOUN': NOUN,
