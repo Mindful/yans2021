@@ -12,6 +12,7 @@ bloom-filter2
 pydantic
 cachetools
 nltk
+matplotlib
 
 #generationary dependency
 nltk
