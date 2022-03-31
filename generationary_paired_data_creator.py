@@ -20,6 +20,27 @@ POS_DICT = {
 }
 
 
+def get_closest_words_with_sentences(target_embedding, words, input_sentence_db):
+    word_embeddings = np.array([w.embedding for w in words])
+    target_embedding = np.expand_dims(target_embedding, axis=0)
+    distances = cdist(target_embedding, word_embeddings)[0]
+    sort_indices = np.argsort(distances)[:5]
+
+    closest_words = []
+    for idx in sort_indices:
+        closest_words.append(words[idx])
+
+    closest_sentence_ids = [w.sentence for w in closest_words]
+
+    sentences = input_sentence_db.read_sentences(use_tqdm=False, where_clause=f' where id IN ({",".join(str(x) for x in closest_sentence_ids)})')
+    sentence_map = {
+        ident: text for ident, text in sentences
+    }
+    closest_words = [w._replace(sentence=sentence_map[w.sentence]) for w in closest_words]
+
+    return closest_words
+
+
 def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, example: Example, cont: Context,
                               max_added_sents: int, max_total_length: int) -> str:
 
@@ -43,22 +64,7 @@ def target_line_with_clusters(sentence_db: DbConnection, word_db: DbConnection, 
     if len(words) == 0:
         return base_line_src
 
-    word_embeddings = np.array([w.embedding for w in words])
-    target_embedding = np.expand_dims(example.embedding, axis=0)
-    distances = cdist(target_embedding, word_embeddings)[0]
-    sort_indices = np.argsort(distances)[:5]
-
-    closest_words = []
-    for idx in sort_indices:
-        closest_words.append(words[idx])
-
-    closest_sentence_ids = [w.sentence for w in closest_words]
-
-    sentences = sentence_db.read_sentences(use_tqdm=False, where_clause=f' where id IN ({",".join(str(x) for x in closest_sentence_ids)})')
-    sentence_map = {
-        ident: text for ident, text in sentences
-    }
-    closest_words = [w._replace(sentence=sentence_map[w.sentence]) for w in closest_words]
+    closest_words = get_closest_words_with_sentences(example.embedding, words, sentence_db)
 
     addition_sentences = []
     current_length = len(base_line_src)
